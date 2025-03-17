@@ -79,6 +79,8 @@ app.use((req, res, next) => {
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
+app.use("/products", productsRouter);
+app.use("/classes", classesRouter);
 app.use("/articles", articlesRouter);
 app.use("/friends", friendsRouter);
 

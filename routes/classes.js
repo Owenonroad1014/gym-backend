@@ -35,11 +35,13 @@ const getCalendarData = async (req) => {
       `SELECT 
     classes.*,
     coaches.name as coach_name,
+    class_types.type_name as title,
     DATE_FORMAT(class_date, '%Y-%m-%d') as class_date,
     TIME_FORMAT(start_time, '%H:%i') as start_time,
     TIME_FORMAT(end_time, '%H:%i') as end_time
     FROM classes 
     LEFT JOIN coaches ON classes.coach_id = coaches.id
+    LEFT JOIN class_types ON classes.type_id = class_types.id
     ${where}
     LIMIT ${limitStart}, ${output.perPage}`
     );
