@@ -12,6 +12,8 @@ import upload from "./utils/upload-images.js";
 import admin2Router from "./routes/admin2.js";
 import abRouter from "./routes/address-book.js";
 import coachesRouter from "./routes/coaches.js";
+import articlesRouter from "./routes/articles.js";
+import friendsRouter from "./routes/friends.js";
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -74,6 +76,8 @@ app.use((req, res, next) => {
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
+app.use("/articles", articlesRouter);
+app.use("/friends", friendsRouter);
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
@@ -311,6 +315,13 @@ app.post("/login-jwt", async (req, res) => {
 app.get("/jwt-data", (req, res) => {
   res.json(req.my_jwt);
 });
+
+
+
+
+
+
+
 // ************** 404 要在所有的路由之後 ****************
 app.use((req, res) => {
   res.status(404).send(`<h1>您走錯路了</h1>
