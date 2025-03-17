@@ -12,6 +12,7 @@ import upload from "./utils/upload-images.js";
 import admin2Router from "./routes/admin2.js";
 import abRouter from "./routes/address-book.js";
 import coachesRouter from "./routes/coaches.js";
+import productsRouter from "./routes/products.js";
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -74,6 +75,7 @@ app.use((req, res, next) => {
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
+app.use("/products", productsRouter);
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
