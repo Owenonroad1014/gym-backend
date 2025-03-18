@@ -3,7 +3,6 @@ import db from "../utils/connect-mysql.js";
 
 const router = express.Router();
 
-
 const getFriendList = async (req) => {
     const member_id = req.my_jwt?.id;
     const output = {
@@ -66,7 +65,7 @@ const getFriendList = async (req) => {
 
         return { ...output, totalRows, totalPages, page, rows, success: true };
     } catch (err) {
-        console.error("Error occurred while fetching article list:", err);
+        console.error("Error occurred while fetching friend list:", err);
         output.error = "資料加載失敗，請稍後再試。";
         return output;
     }
@@ -79,19 +78,65 @@ router.get("/api", async (req, res) => {
 });
 
 // 刪除好友列表
+router.delete("/api/delete", async (req, res) => {
+    const member_id = req.my_jwt?.id;
+    const { user } = req.body;
+    const output = {
+        success: false,
+        data: [],
+        error: "",
+    };
+    //  登入
+    if (!member_id) {
+        output.error = "需要登入會員";
+        return res.json(output);
+    }
+    // 好友
+    if (!user) {
+        output.error = "沒有此好友";
+        return res.json(output);
+    }
+    const sqlDelete = `DELETE FROM friendships
+        WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id =?);`;
+    try {
+        const [result] = await db.query(sqlDelete, [
+            member_id,
+            user,
+            user,
+            member_id,
+        ]);
+        if (result.affectedRows > 0) {
+            output.success = true;
+            output.data = result;
+            output.status = "成功刪除";
+        } else {
+            output.error = "未找到好友關係，無法刪除";
+        }
+        res.json(output);
+    } catch (err) {
+        output.error = "無法刪除";
+        res.json(output);
+    }
+});
 
 // 取得好友邀請列表
 router.get("/api/invite", async (req, res) => {
     const member_id = req.my_jwt?.id;
     const output = {
         success: false,
-        data: "",
+        data: [],
         error: "",
+        totalRows: 0,
     };
     if (!member_id) {
         output.error = "需要登入會員";
     }
-    const sql = `SELECT * FROM friend_requests WHERE receiver_id=? AND status="pending"`;
+    const t_sql = `
+    SELECT count(*) AS totalRows FROM friend_requests left join members on friend_requests.sender_id = members.id WHERE receiver_id=? AND status="pending" `;
+    const [[{ totalRows }]] = await db.query(t_sql, [member_id]); // 取得總筆數
+    output.totalRows = totalRows;
+    const sql = `
+    SELECT friend_requests.* , members.name AS sender_name FROM friend_requests left join members on friend_requests.sender_id = members.id WHERE receiver_id=? AND status="pending" `;
     const [data] = await db.query(sql, [member_id]);
     if (!data.length) {
         output.error = "沒有好友邀請";
@@ -108,7 +153,7 @@ router.post("/api/request", async (req, res) => {
     const { receiver_id } = req.body;
     const output = {
         success: false,
-        data: "",
+        data: [],
         error: "",
     };
     //  登入
@@ -120,6 +165,10 @@ router.post("/api/request", async (req, res) => {
     if (!receiver_id) {
         output.error = "未提供接收者 ID";
         return res.json(output);
+    }
+    if (member_id == receiver_id) {
+        output.error = "邀請者與被邀請者相同";
+        return res.json(output)
     }
     // 2. 有沒有這個項目
     const sql = `SELECT * FROM  friend_requests WHERE sender_id=? AND receiver_id =?`;
@@ -144,10 +193,10 @@ router.post("/api/request", async (req, res) => {
 // 接受好友邀請api
 router.post("/api/accept", async (req, res) => {
     const member_id = req.my_jwt?.id;
-    const { receiver_id } = req.body;
+    const { sender_id } = req.body;
     const output = {
         success: false,
-        data: "",
+        data: [],
         error: "",
     };
     //  登入
@@ -155,31 +204,81 @@ router.post("/api/accept", async (req, res) => {
         output.error = "需要登入會員";
         return res.json(output);
     }
-    // 被邀請者
-    // if (!receiver_id) {
-    //     output.error = "未提供接收者 ID";
-    //     return res.json(output);
-    // }
+
     // 2. 有沒有這個項目
-    const sql = `SELECT * FROM  friend_requests WHERE receiver_id =?`;
-    const [rows] = await db.query(sql, [member_id]);
+    const sql = `SELECT * FROM friend_requests WHERE receiver_id = ? AND sender_id = ? AND status = 'pending'`;
+    const [rows] = await db.query(sql, [member_id, sender_id]);
     if (!rows.length) {
         output.error = "目前沒有邀請";
         return res.json(output);
     }
+
     const sqlUpdate = `UPDATE friend_requests
                         SET status = 'accepted'
                         WHERE sender_id = ? AND receiver_id = ? AND status = 'pending';
                         `;
     try {
-        const [result] = await db.query(sqlUpdate, [member_id, receiver_id]);
+        const [result] = await db.query(sqlUpdate, [sender_id, member_id]);
         output.success = !!result.affectedRows;
-        output.data = { sender_id: member_id, receiver_id, status: "pending" };
+        if (result.affectedRows) {
+            const friendshipUpdateSql = `
+                INSERT INTO friendships (user1_id, user2_id)
+                VALUES (?, ?)
+            `;
+            await db.query(friendshipUpdateSql, [member_id, sender_id]);
+
+            output.success = true;
+            output.updateStatus = "已成為好友";
+        } else {
+            output.error = "更新邀請狀態失敗";
+        }
+        output.data = { sender_id, receiver_id: member_id, status: "accepted" };
         res.json(output);
     } catch (err) {
         output.error = "data錯誤";
         res.json(output);
     }
 });
+
+// 拒絕好友邀請api
+router.post("/api/reject", async (req, res) => {
+    const member_id = req.my_jwt?.id;
+    const { sender_id } = req.body;
+    const output = {
+        success: false,
+        data: [],
+        error: "",
+    };
+    //  登入
+    if (!member_id) {
+        output.error = "需要登入會員";
+        return res.json(output);
+    }
+
+    // 2. 有沒有這個項目
+    const sql = `SELECT * FROM friend_requests WHERE receiver_id = ? AND sender_id = ? AND status = 'pending'`;
+    const [rows] = await db.query(sql, [member_id, sender_id]);
+    if (!rows.length) {
+        output.error = "目前沒有邀請";
+        return res.json(output);
+    }
+
+    const sqlUpdate = `UPDATE friend_requests
+                        SET status = 'rejected'
+                        WHERE sender_id = ? AND receiver_id = ? AND status = 'pending';
+                        `;
+    try {
+        const [result] = await db.query(sqlUpdate, [sender_id, member_id]);
+        // output.success = !!result.affectedRows;
+        output.success = true;
+        output.data = { sender_id, receiver_id: member_id, status: "rejected" };
+        res.json(output);
+    } catch (err) {
+        output.error = "data錯誤";
+        res.json(output);
+    }
+});
+
+
 
 export default router;

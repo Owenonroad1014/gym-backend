@@ -15,6 +15,7 @@ import coachesRouter from "./routes/coaches.js";
 import productsRouter from "./routes/products.js";
 import articlesRouter from "./routes/articles.js";
 import friendsRouter from "./routes/friends.js";
+import chatsRouter from "./routes/chats.js";
 
 
 const MysqlStore = mysql_session(session);
@@ -81,6 +82,7 @@ app.use("/coaches", coachesRouter);
 app.use("/products", productsRouter);
 app.use("/articles", articlesRouter);
 app.use("/friends", friendsRouter);
+app.use("/chats", chatsRouter);
 
 
 app.get("/", (req, res) => {
