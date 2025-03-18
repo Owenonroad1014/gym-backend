@@ -23,7 +23,7 @@ const getListData = async (req) => {
     };
 
     // 取得查詢參數
-    const {location, branch} = req.query;
+    const {location, branch, keyword} = req.query;
     
     let where = ' WHERE 1 ';
     if(location) {
@@ -31,6 +31,9 @@ const getListData = async (req) => {
     }
     if(branch) {
         where += ` AND branch = ${db.escape(branch)}`;
+    }
+    if(keyword) {
+        where += ` AND (name LIKE ${db.escape(`%${keyword}%`)})`; 
     }
 
     // 查詢總筆數
