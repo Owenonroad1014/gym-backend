@@ -14,7 +14,7 @@ const fileFilter = (req, file, callback) => {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "public/imgs");
+    cb(null, "public/img");
   },
   filename: (req, file, cb) => {
     const f = v4() + extMap[file.mimetype];
