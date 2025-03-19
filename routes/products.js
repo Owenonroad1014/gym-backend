@@ -152,6 +152,44 @@ router.get("/api", async (req, res) => {
   res.json(data);
 });
 
+router.get("/api/:productId", async (req, res) => {
+  const productId = req.params.productId; // 獲取 URL 中的商品 ID
+  const output = { success: false, data: null };
+
+  try {
+    const sql = `
+      SELECT p.id, 
+      p.product_code, 
+      p.name AS product_name, 
+      p.description, 
+      c.category_name, 
+      p.price, 
+      p.image_url, 
+      p.average_rating, 
+      p.created_at,
+      JSON_ARRAYAGG(
+      JSON_OBJECT('variant_id', pv.id, 'weight', pv.weight, 'image_url', pv.image_url)
+      ) AS variants
+      FROM Products p
+      JOIN Categories c ON p.category_id = c.id
+      LEFT JOIN ProductVariants pv ON p.id = pv.product_id
+      WHERE p.id = ?
+      GROUP BY p.id;
+    `;
+
+    const [rows] = await db.query(sql, [productId]);
+
+    if (rows.length > 0) {
+      output.success = true;
+      output.data = rows[0]; // 只取第一筆
+    }
+  } catch (error) {
+    output.error = error.message;
+  }
+  console.log("API 回傳資料：", JSON.stringify(output, null, 2));
+  res.json(output);
+});
+
 router.post("/api", upload.single('avatar'), async (req, res) => {
   const output = {
     success: false,
