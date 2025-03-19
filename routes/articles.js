@@ -1,5 +1,5 @@
 import express from "express";
-import db from "../untils/connect-mysql.js";
+import db from "../utils/connect-mysql.js";
 
 const router = express.Router();
 const getListData = async (req) => {
