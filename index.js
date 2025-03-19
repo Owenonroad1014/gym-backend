@@ -17,7 +17,6 @@ import articlesRouter from "./routes/articles.js";
 import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
 
-
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
 
@@ -28,7 +27,6 @@ app.set("view engine", "ejs");
 // 設定靜態內容資料夾
 app.use(express.static("public"));
 app.use("/bootstrap", express.static("node_modules/bootstrap/dist"));
-
 
 // **** top-level middlewares 頂層中介軟體 ****
 app.use(express.urlencoded({ extended: true }));
@@ -201,7 +199,7 @@ app.post("/login", upload.none(), async (req, res) => {
   email = email.trim().toLowerCase(); // 去掉頭尾空白字元
   password = password.trim();
 
-  const sql = `SELECT * FROM members WHERE email=? `;
+  const sql = `SELECT * FROM member WHERE email=? `;
   const [rows] = await db.query(sql, [email]);
   if (!rows.length) {
     output.code = 400; // 表示帳號是錯的
@@ -285,7 +283,8 @@ app.post("/login-jwt", async (req, res) => {
     return res.json(output);
   }
 
-  const sql = "SELECT * FROM members WHERE email=?";
+  const sql =
+    "SELECT member.*,member_profile.nickname FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id WHERE email = ?";
   const [rows] = await db.query(sql, [account]);
   if (!rows.length) {
     output.error = "帳號或密碼錯誤";
@@ -320,12 +319,6 @@ app.post("/login-jwt", async (req, res) => {
 app.get("/jwt-data", (req, res) => {
   res.json(req.my_jwt);
 });
-
-
-
-
-
-
 
 // ************** 404 要在所有的路由之後 ****************
 app.use((req, res) => {
