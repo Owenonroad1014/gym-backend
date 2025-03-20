@@ -16,7 +16,7 @@ import productsRouter from "./routes/products.js";
 import articlesRouter from "./routes/articles.js";
 import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
-
+import registerRouter from "./routes/register.js";
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
 
@@ -74,6 +74,7 @@ app.use((req, res, next) => {
 });
 
 // 定義路由
+app.use("/register", registerRouter)
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
