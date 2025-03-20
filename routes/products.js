@@ -153,8 +153,8 @@ router.get("/api", async (req, res) => {
 });
 
 router.get("/api/:productId", async (req, res) => {
-  const productId = req.params.productId; // 獲取 URL 中的商品 ID
-  const output = { success: false, data: null };
+  const productId = req.params.productId;
+  const output = { success: false, data: null, relatedProducts: [] };
 
   try {
     const sql = `
@@ -168,7 +168,7 @@ router.get("/api/:productId", async (req, res) => {
       p.average_rating, 
       p.created_at,
       JSON_ARRAYAGG(
-      JSON_OBJECT('variant_id', pv.id, 'weight', pv.weight, 'image_url', pv.image_url)
+        JSON_OBJECT('variant_id', pv.id, 'weight', pv.weight, 'image_url', pv.image_url)
       ) AS variants
       FROM Products p
       JOIN Categories c ON p.category_id = c.id
@@ -180,13 +180,33 @@ router.get("/api/:productId", async (req, res) => {
     const [rows] = await db.query(sql, [productId]);
 
     if (rows.length > 0) {
+      let productData = rows[0];
+
+      // 檢查所有 variants 是否 weight 為 null
+      let hasValidVariants = productData.variants.some(variant => variant.weight !== null);
+
+      // 如果所有 weight 都是 null，就設為 null
+      productData.variants = hasValidVariants ? productData.variants : null;
+
       output.success = true;
-      output.data = rows[0]; // 只取第一筆
+      output.data = productData;
+
+      // 取得相關產品
+      const relatedSql = `
+        SELECT p.id, p.name AS product_name, p.price, p.image_url, p.description
+        FROM Products p
+        JOIN Categories c ON p.category_id = c.id
+        WHERE c.category_name = ? AND p.id != ?
+        LIMIT 4;
+      `;
+
+      const [relatedRows] = await db.query(relatedSql, [productData.category_name, productId]);
+      output.relatedProducts = relatedRows;
     }
   } catch (error) {
     output.error = error.message;
   }
-  console.log("API 回傳資料：", JSON.stringify(output, null, 2));
+  
   res.json(output);
 });
 
