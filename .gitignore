@@ -6,6 +6,7 @@
 .vscode
 headers.txt
 package-lock.json
+dev.env
 
 tmp_uploads
 public/imgs
@@ -14,7 +15,7 @@ public/imgs
 # Node artifact files
 node_modules/
 dist/
-dev.env
+
 
 # Compiled Java class files
 *.class
