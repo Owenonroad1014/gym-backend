@@ -17,8 +17,7 @@ import articlesRouter from "./routes/articles.js";
 import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
-
-
+import registerRouter from "./routes/register.js";
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
 
@@ -29,7 +28,6 @@ app.set("view engine", "ejs");
 // 設定靜態內容資料夾
 app.use(express.static("public"));
 app.use("/bootstrap", express.static("node_modules/bootstrap/dist"));
-
 
 // **** top-level middlewares 頂層中介軟體 ****
 app.use(express.urlencoded({ extended: true }));
@@ -77,6 +75,7 @@ app.use((req, res, next) => {
 });
 
 // 定義路由
+app.use("/register", registerRouter)
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
@@ -203,7 +202,7 @@ app.post("/login", upload.none(), async (req, res) => {
   email = email.trim().toLowerCase(); // 去掉頭尾空白字元
   password = password.trim();
 
-  const sql = `SELECT * FROM members WHERE email=? `;
+  const sql = `SELECT * FROM member WHERE email=? `;
   const [rows] = await db.query(sql, [email]);
   if (!rows.length) {
     output.code = 400; // 表示帳號是錯的
@@ -275,7 +274,7 @@ app.post("/login-jwt", async (req, res) => {
     data: {
       id: 0,
       account: "",
-      nickname: "",
+      // avatar: "",
       token: "",
     },
   };
@@ -287,7 +286,8 @@ app.post("/login-jwt", async (req, res) => {
     return res.json(output);
   }
 
-  const sql = "SELECT * FROM members WHERE email=?";
+  const sql =
+    "SELECT member.*,member_profile.avatar FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id WHERE email = ?";
   const [rows] = await db.query(sql, [account]);
   if (!rows.length) {
     output.error = "帳號或密碼錯誤";
@@ -296,6 +296,9 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const row = rows[0];
+  // const avatarUrl = row.avatar
+  // ? `/img/${user.avatar}`
+  // : '/img/default_avatar.png';
   const result = await bcrypt.compare(password, row.password_hash);
   if (!result) {
     output.error = "帳號或密碼錯誤";
@@ -313,7 +316,7 @@ app.post("/login-jwt", async (req, res) => {
   output.data = {
     id: row.member_id,
     account: row.email,
-    nickname: row.nickname,
+    // avatar: avatarUrl,
     token,
   };
   res.json(output);
@@ -322,12 +325,6 @@ app.post("/login-jwt", async (req, res) => {
 app.get("/jwt-data", (req, res) => {
   res.json(req.my_jwt);
 });
-
-
-
-
-
-
 
 // ************** 404 要在所有的路由之後 ****************
 app.use((req, res) => {

@@ -152,6 +152,64 @@ router.get("/api", async (req, res) => {
   res.json(data);
 });
 
+router.get("/api/:productId", async (req, res) => {
+  const productId = req.params.productId;
+  const output = { success: false, data: null, relatedProducts: [] };
+
+  try {
+    const sql = `
+      SELECT p.id, 
+      p.product_code, 
+      p.name AS product_name, 
+      p.description, 
+      c.category_name, 
+      p.price, 
+      p.image_url, 
+      p.average_rating, 
+      p.created_at,
+      JSON_ARRAYAGG(
+        JSON_OBJECT('variant_id', pv.id, 'weight', pv.weight, 'image_url', pv.image_url)
+      ) AS variants
+      FROM Products p
+      JOIN Categories c ON p.category_id = c.id
+      LEFT JOIN ProductVariants pv ON p.id = pv.product_id
+      WHERE p.id = ?
+      GROUP BY p.id;
+    `;
+
+    const [rows] = await db.query(sql, [productId]);
+
+    if (rows.length > 0) {
+      let productData = rows[0];
+
+      // 檢查所有 variants 是否 weight 為 null
+      let hasValidVariants = productData.variants.some(variant => variant.weight !== null);
+
+      // 如果所有 weight 都是 null，就設為 null
+      productData.variants = hasValidVariants ? productData.variants : null;
+
+      output.success = true;
+      output.data = productData;
+
+      // 取得相關產品
+      const relatedSql = `
+        SELECT p.id, p.name AS product_name, p.price, p.image_url, p.description
+        FROM Products p
+        JOIN Categories c ON p.category_id = c.id
+        WHERE c.category_name = ? AND p.id != ?
+        LIMIT 4;
+      `;
+
+      const [relatedRows] = await db.query(relatedSql, [productData.category_name, productId]);
+      output.relatedProducts = relatedRows;
+    }
+  } catch (error) {
+    output.error = error.message;
+  }
+  
+  res.json(output);
+});
+
 router.post("/api", upload.single('avatar'), async (req, res) => {
   const output = {
     success: false,
