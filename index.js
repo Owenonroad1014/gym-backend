@@ -16,6 +16,7 @@ import productsRouter from "./routes/products.js";
 import articlesRouter from "./routes/articles.js";
 import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
+import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -82,6 +83,7 @@ app.use("/products", productsRouter);
 app.use("/classes", classesRouter);
 app.use("/articles", articlesRouter);
 app.use("/friends", friendsRouter);
+app.use("/locations", locationsRouter);
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
