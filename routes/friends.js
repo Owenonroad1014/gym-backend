@@ -45,20 +45,22 @@ const getFriendList = async (req) => {
             // 獲取文章列表並檢查是否有收藏的資訊
             const sql = `
                 SELECT 
-                    sub.*, 
+                    sub.member_id, 
+                    sub.user1_id, 
+                    sub.user2_id, 
                     m1.name AS user1_name, 
                     m2.name AS user2_name
                 FROM 
-                    (SELECT * 
-                    FROM members 
+                    (SELECT member_id, user1_id, user2_id 
+                    FROM member
                     LEFT JOIN friendships 
-                    ON members.id = friendships.user1_id 
-                    OR members.id = friendships.user2_id 
-                    WHERE members.id = ?) AS sub
-                LEFT JOIN members AS m1 
-                ON sub.user1_id = m1.id
-                LEFT JOIN members AS m2 
-                ON sub.user2_id = m2.id;
+                    ON member.member_id = friendships.user1_id 
+                    OR member.member_id = friendships.user2_id 
+                    WHERE member.member_id = ?) AS sub
+                LEFT JOIN member AS m1 
+                ON sub.user1_id = m1.member_id
+                LEFT JOIN member AS m2 
+                ON sub.user2_id = m2.member_id;
             `;
             [rows] = await db.query(sql, [member_id]);
         }
@@ -132,11 +134,11 @@ router.get("/api/invite", async (req, res) => {
         output.error = "需要登入會員";
     }
     const t_sql = `
-    SELECT count(*) AS totalRows FROM friend_requests left join members on friend_requests.sender_id = members.id WHERE receiver_id=? AND status="pending" `;
+    SELECT count(*) AS totalRows FROM friend_requests left join member on friend_requests.sender_id = member.member_id WHERE receiver_id=? AND status="pending" `;
     const [[{ totalRows }]] = await db.query(t_sql, [member_id]); // 取得總筆數
     output.totalRows = totalRows;
     const sql = `
-    SELECT friend_requests.* , members.name AS sender_name FROM friend_requests left join members on friend_requests.sender_id = members.id WHERE receiver_id=? AND status="pending" `;
+    SELECT friend_requests.* , member.name AS sender_name FROM friend_requests left join member on friend_requests.sender_id = member.member_id WHERE receiver_id=? AND status="pending" `;
     const [data] = await db.query(sql, [member_id]);
     if (!data.length) {
         output.error = "沒有好友邀請";
@@ -168,7 +170,7 @@ router.post("/api/request", async (req, res) => {
     }
     if (member_id == receiver_id) {
         output.error = "邀請者與被邀請者相同";
-        return res.json(output)
+        return res.json(output);
     }
     // 2. 有沒有這個項目
     const sql = `SELECT * FROM  friend_requests WHERE sender_id=? AND receiver_id =?`;
@@ -226,9 +228,20 @@ router.post("/api/accept", async (req, res) => {
                 VALUES (?, ?)
             `;
             await db.query(friendshipUpdateSql, [member_id, sender_id]);
-
+            const addsql = `INSERT INTO chats (user1_id,user2_id) VALUES (?,?);`;
+            await db.query(addsql, [member_id, sender_id]);
+            const findchatroomsql = `SELECT id chat_id FROM chats WHERE user1_id = ? AND user2_id = ?`;
+            const [{ chat_id }] = await db.query(findchatroomsql, [
+                member_id,
+                sender_id,
+            ]);
+            const invitesql = `INSERT INTO messages (chat_id,sender_id,message) VALUES (?,?,'邀請你一起運動吧!!');`;
+            console.log(chat_id,sender_id);
+            
+            await db.query(invitesql, [chat_id, sender_id]);
             output.success = true;
             output.updateStatus = "已成為好友";
+            output.chatroom = "已創建";
         } else {
             output.error = "更新邀請狀態失敗";
         }
@@ -278,7 +291,5 @@ router.post("/api/reject", async (req, res) => {
         res.json(output);
     }
 });
-
-
 
 export default router;
