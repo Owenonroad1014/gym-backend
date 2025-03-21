@@ -60,11 +60,14 @@ router.post("/api", async (req, res) => {
   const output = {
     success: false,
     error: "",
-    data: { id: 0 },
+    data: {
+      id: 0,
+    },
     bodyData: req.body,
     result: null,
     profileResult: null,
   };
+
   let { email, password } = req.body;
   const zResult = abSchema.safeParse(req.body);
   // 如果資料驗證沒過
@@ -128,4 +131,74 @@ router.post("/api", async (req, res) => {
   res.json(output);
 });
 
+// router.put("/api/:member_id", upload.single("avatar"), async (req, res) => {
+//   const output = {
+//     success: false,
+//     bodyData: req.body,
+//     result: null,
+//     error: "",
+//   };
+
+//   // 先取到原本的項目資料
+//   const {
+//     success,
+//     error,
+//     data: originalData,
+//   } = await getItemById(req.params.ab_id);
+//   if (!success) {
+//     output.error = error;
+//     return res.json(output);
+//   }
+
+//   // 表單資料
+//   let { name, email, mobile, birthday, address } = req.body;
+
+//   // 表單驗證
+//   const zResult = abSchema.safeParse(req.body);
+//   // 如果資料驗證沒過
+//   if (!zResult.success) {
+//     if (req.file?.filename) {
+//       removeUploadedImg(req.file.filename);
+//     }
+//     return res.json(zResult);
+//   }
+
+//   // 處理 birthday 沒有填寫的情況
+//   if (birthday === undefined) {
+//     birthday = null;
+//   } else {
+//     const b = moment(birthday);
+//     if (b.isValid()) {
+//       birthday = b.format(dateFormat);
+//     } else {
+//       birthday = null;
+//     }
+//   }
+
+//   const dataObj = { name, email, mobile, birthday, address };
+//   // 判斷有沒有上傳頭貼
+//   if (req.file?.filename) {
+//     dataObj.avatar = req.file.filename;
+//   }
+
+//   const sql = `
+//     UPDATE address_book SET ? WHERE ab_id=?;
+//   `;
+//   try {
+//     const [result] = await db.query(sql, [dataObj, originalData.ab_id]);
+//     output.result = result;
+//     output.success = !!result.changedRows;
+//     // 判斷有沒有上傳頭貼, 有的話刪掉之前的頭貼
+//     if (req.file?.filename) {
+//       removeUploadedImg(originalData.avatar);
+//     }
+//   } catch (ex) {
+//     if (req.file?.filename) {
+//       removeUploadedImg(req.file.filename);
+//     }
+//     output.ex = ex;
+//   }
+
+//   res.json(output);
+// });
 export default router;
