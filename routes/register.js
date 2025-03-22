@@ -1,11 +1,8 @@
 import express from "express";
 import { rgstSchema,pfSchema } from  "../utils/schema/schema.js"
-
 import db from "../utils/connect-mysql.js";
 import upload from "../utils/upload-images.js";
 import bcrypt from "bcrypt";
-import { name } from "ejs";
-
 
 const router = express.Router();
 
@@ -148,7 +145,7 @@ router.put("/api/profile", upload.single("avatar"), async (req, res) => {
   let { name, avatar, sex, mobile, intro, item, goal, status } = req.body;
 
   // 表單驗證
-  const zResult = rgstSchema.safeParse(req.body);
+  const zResult = pfSchema.safeParse(req.body);
   // 如果資料驗證沒過
   if (!zResult.success) {
     if (req.file?.filename) {
