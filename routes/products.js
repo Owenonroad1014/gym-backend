@@ -185,7 +185,8 @@ router.get("/api/:productId", async (req, res) => {
       JOIN Categories c ON p.category_id = c.id
       LEFT JOIN ProductVariants pv ON p.id = pv.product_id
       WHERE p.id = ?
-      GROUP BY p.id;
+      GROUP BY p.id, p.product_code, p.name, p.description, c.category_name, 
+         p.price, p.image_url, p.average_rating, p.created_at;
     `;
 
     const [rows] = await db.query(sql, [productId]);
