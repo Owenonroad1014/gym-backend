@@ -45,7 +45,7 @@ const getListData = async (req) => {
     keyword: ""
   };
 
-  const member_id = req.my_jwt?.id;
+  const memberId = req.my_jwt?.id; 
 
   const perPage = output.perPage;
   let page = +req.query.page || 1;
@@ -87,37 +87,37 @@ const getListData = async (req) => {
       return output;
     }
 
-    let favoriteSelect = "";
-    let favoriteJoin = "";
-    let queryParams = [];
 
-    if (member_id) {
-        // **如果有登入，才查詢收藏狀態**
-        favoriteSelect = ", IF(f.id IS NOT NULL, 1, 0) AS is_favorite"; // 判斷是否收藏
-        favoriteJoin = "LEFT JOIN favorites f ON p.id = f.product_id AND f.member_id = ?";
-    } else {
-        // **如果未登入，預設愛心為空心**
-        favoriteSelect = ", 0 AS is_favorite";
-    }
 
-    const sql = `
+    if (memberId) {
+      const sql = `
+      SELECT p.id, p.product_code, p.name AS product_name, p.description, 
+      c.category_name, p.price, p.image_url, p.average_rating, 
+      p.created_at, l.like_id
+        FROM Products p LEFT JOIN (
+        SELECT * FROM favorites WHERE member_id = ${memberId}
+        )l ON p.id = l.product_id left
+        JOIN Categories c ON p.category_id = c.id
+        ${where} 
+        ORDER BY p.id 
+        LIMIT ${(page - 1) * perPage}, ${perPage}
+  `;[rows] = await db.query(sql);}
+      else{let sql = `
         SELECT p.id, p.product_code, p.name AS product_name, p.description, 
-               c.category_name, p.price, p.image_url, p.average_rating, 
-               p.created_at
-               ${favoriteSelect}  -- 是否已收藏
+        c.category_name, p.price, p.image_url, p.average_rating, 
+        p.created_at
         FROM Products p
         JOIN Categories c ON p.category_id = c.id
-        ${favoriteJoin}
         ${where} 
         ORDER BY p.id 
         LIMIT ${(page - 1) * perPage}, ${perPage}
     `;
 
-    [rows] = await db.query(sql, queryParams);
-}
-
+    [rows] = await db.query(sql);
+  }
+    
   return { ...output, totalRows, totalPages, page, rows, success: true };
-};
+};}
 
 router.use((req, res, next) => {
   return next(); // 先讓 middleware 內容沒有功能
@@ -160,6 +160,7 @@ router.get("/add", async(req, res) => {
 router.get("/api", async (req, res) => {
   const data = await getListData(req);
   res.json(data);
+  console.log("Request body:", req.body);
 });
 
 router.get("/api/:productId", async (req, res) => {
@@ -264,33 +265,55 @@ router.post("/api", upload.single('avatar'), async (req, res) => {
 // CORS 設置應該只需要一次
 });
 //收藏api
-router.post("/toggle-favorite", async (req, res) => {
-  const { member_id, product_id } = req.body;
-  
+router.get("/api/toggle-like/:productId", async (req, res) => {
+  // 會員 : req.session.admin.member_id
+  const output = {
+    success: false, // 有沒有成功完成操作
+    action: "", // add, remove // 5. 回應時: "加入" 或 "移除", 哪一個項目
+    product_id: 0, // 操作的項目是哪一個
+    error: "",
+  };
+
+  const member_id = req.my_jwt?.id; // 使用 JWT 登入功能
   if (!member_id) {
-      return res.status(401).json({ success: false, message: "請先登入" });
+    output.error = "需要登入會員";
+    return res.json(output);
+  }
+  const product_id = +req.params.productId || 0;
+  if (!product_id) {
+    output.error = "項目編號必須是整數";
+    return res.json(output);
   }
 
-  try {
-      // 檢查是否已收藏
-      const checkSql = "SELECT id FROM favorites WHERE member_id = ? AND product_id = ?";
-      const [rows] = await db.query(checkSql, [member_id, product_id]);
+console.log("Member ID:", member_id);
+console.log("Product ID:", product_id);
 
-      if (rows.length > 0) {
-          // **已收藏，則取消收藏**
-          const deleteSql = "DELETE FROM favorites WHERE member_id = ? AND product_id = ?";
-          await db.query(deleteSql, [member_id, product_id]);
-          return res.json({ success: true, action: "removed" });
-      } else {
-          // **未收藏，則加入收藏**
-          const insertSql = "INSERT INTO favorites (member_id, product_id) VALUES (?, ?)";
-          await db.query(insertSql, [member_id, product_id]);
-          return res.json({ success: true, action: "added" });
-      }
-  } catch (error) {
-      console.error("Error toggling favorite:", error);
-      res.status(500).json({ success: false, message: "伺服器錯誤" });
+  const sql = `
+    select memberlike.like_id from products left join (SELECT * FROM favorites WHERE member_id=?) memberlike on products.id = memberlike.product_id WHERE products.id =?;
+      `;
+  const [rows] = await db.query(sql, [member_id, product_id]);
+  if (!rows.length) {
+    output.error = "沒有該項目";
+    return res.json(output);
   }
+  output.product_id = product_id;
+  const like_id = rows[0].like_id;
+  if (like_id) {
+    // 3. 有, 就移除
+    output.action = "remove";
+    const sql = `DELETE FROM favorites WHERE like_id=?`;
+    const [result] = await db.query(sql, [like_id]);
+    output.result = result;
+    output.success = !!result.affectedRows;
+  } else {
+    // 4. 沒有, 就加入
+    output.action = "add";
+    const sql = `INSERT INTO favorites (member_id, product_id) VALUES (?, ?) `;
+    const [result] = await db.query(sql, [member_id, product_id]);
+    output.result = result;
+    output.success = !!result.affectedRows;
+  }
+  res.json(output);
 });
 
 export default router;
