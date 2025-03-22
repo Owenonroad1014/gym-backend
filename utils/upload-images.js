@@ -14,7 +14,12 @@ const fileFilter = (req, file, callback) => {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "public/img");
+    let uploadPath = "public/img";
+    if (req.body.folder==="avatar") {
+      uploadPath += `/${req.body.folder}`;
+    }
+
+    cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     const f = v4() + extMap[file.mimetype];

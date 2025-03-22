@@ -45,6 +45,8 @@ const getListData = async (req) => {
     keyword: ""
   };
 
+  const member_id = req.my_jwt?.id;
+
   const perPage = output.perPage;
   let page = +req.query.page || 1;
   let keyword = req.query.keyword ? req.query.keyword.trim() : "";
@@ -67,39 +69,52 @@ const getListData = async (req) => {
     let category_ = db.escape(category); // 確保 category 是安全的
     where += ` AND (c.category_name = ${category_})`;
 }
-
+  // 取得總筆數
   const t_sql = `  SELECT COUNT(1) AS totalRows 
   FROM products p 
   JOIN Categories c ON p.category_id = c.id 
   ${where} `;
-  const [[{ totalRows }]] = await db.query(t_sql); // 取得總筆數
+  const [[{ totalRows }]] = await db.query(t_sql); 
+
+  // 計算總頁數
   const totalPages = Math.ceil(totalRows / perPage);
+
   let rows = [];
+  // 確保頁碼不超過總頁數
   if (totalRows) {
     if (page > totalPages) {
       output.redirect = `?page=${totalPages}`;
       return output;
     }
 
-    const sql = `SELECT     
-    p.id,
-    p.product_code,
-    p.name AS product_name,
-    p.description,
-    c.category_name,
-    p.price,
-    p.image_url,
-    p.average_rating,
-    p.created_at 
-    FROM Products p 
-    JOIN Categories c ON p.category_id = c.id
-    ${where} 
-    ORDER BY id 
-    LIMIT ${
-      (page - 1) * perPage
-    }, ${perPage}`;
-    [rows] = await db.query(sql);
-  }
+    let favoriteSelect = "";
+    let favoriteJoin = "";
+    let queryParams = [];
+
+    if (member_id) {
+        // **如果有登入，才查詢收藏狀態**
+        favoriteSelect = ", IF(f.id IS NOT NULL, 1, 0) AS is_favorite"; // 判斷是否收藏
+        favoriteJoin = "LEFT JOIN favorites f ON p.id = f.product_id AND f.member_id = ?";
+    } else {
+        // **如果未登入，預設愛心為空心**
+        favoriteSelect = ", 0 AS is_favorite";
+    }
+
+    const sql = `
+        SELECT p.id, p.product_code, p.name AS product_name, p.description, 
+               c.category_name, p.price, p.image_url, p.average_rating, 
+               p.created_at
+               ${favoriteSelect}  -- 是否已收藏
+        FROM Products p
+        JOIN Categories c ON p.category_id = c.id
+        ${favoriteJoin}
+        ${where} 
+        ORDER BY p.id 
+        LIMIT ${(page - 1) * perPage}, ${perPage}
+    `;
+
+    [rows] = await db.query(sql, queryParams);
+}
 
   return { ...output, totalRows, totalPages, page, rows, success: true };
 };
@@ -132,11 +147,6 @@ router.get("/", async (req, res) => {
   if (data.redirect) {
     // 如果有指示要跳轉, 就跳轉到指示的 URL
     return res.redirect(data.redirect);
-  }
-  if(data.rows.length){
-    res.render("products/list", data);
-  } else {
-    res.render("products/list-no-data", data);
   }
   
 });
@@ -253,4 +263,34 @@ router.post("/api", upload.single('avatar'), async (req, res) => {
 
 // CORS 設置應該只需要一次
 });
+//收藏api
+router.post("/toggle-favorite", async (req, res) => {
+  const { member_id, product_id } = req.body;
+  
+  if (!member_id) {
+      return res.status(401).json({ success: false, message: "請先登入" });
+  }
+
+  try {
+      // 檢查是否已收藏
+      const checkSql = "SELECT id FROM favorites WHERE member_id = ? AND product_id = ?";
+      const [rows] = await db.query(checkSql, [member_id, product_id]);
+
+      if (rows.length > 0) {
+          // **已收藏，則取消收藏**
+          const deleteSql = "DELETE FROM favorites WHERE member_id = ? AND product_id = ?";
+          await db.query(deleteSql, [member_id, product_id]);
+          return res.json({ success: true, action: "removed" });
+      } else {
+          // **未收藏，則加入收藏**
+          const insertSql = "INSERT INTO favorites (member_id, product_id) VALUES (?, ?)";
+          await db.query(insertSql, [member_id, product_id]);
+          return res.json({ success: true, action: "added" });
+      }
+  } catch (error) {
+      console.error("Error toggling favorite:", error);
+      res.status(500).json({ success: false, message: "伺服器錯誤" });
+  }
+});
+
 export default router;
