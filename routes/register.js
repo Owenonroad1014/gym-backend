@@ -1,59 +1,48 @@
 import express from "express";
-import {  z } from "zod";
+import { rgstSchema,pfSchema } from  "../utils/schema/schema.js"
 import db from "../utils/connect-mysql.js";
+import upload from "../utils/upload-images.js";
 import bcrypt from "bcrypt";
 
 const router = express.Router();
 
-const abSchema = z.object({
-  email: z
-    .string({ message: "電子郵箱為必填" })
-    .email({ message: "請填寫正確的電子郵箱" }),
-  password: z
-    .string()
-    .min(8, { message: "密碼至少8個字元" })
-    .regex(/[A-Z]/, {
-      message: "密碼需包含大小寫英文字母、數字、及特殊字元!@#$%^&*",
-    })
-    .regex(/[a-z]/, {
-      message: "密碼需包含大小寫英文字母、數字、及特殊字元!@#$%^&*",
-    })
-    .regex(/\d/, {
-      message: "密碼需包含大小寫英文字母、數字、及特殊字元!@#$%^&*",
-    })
-    .regex(/[@$!%*?&#]/, {
-      message: "密碼需包含大小寫英文字母、數字、及特殊字元!@#$%^&*",
-    }),
-});
-
-router.use((req, res, next) => {
-  return next();
-
-  // const waitMSec = Math.random() * 2000;
-  // setTimeout(() => {
-  //   next();
-  // }, waitMSec);
-  // return;
-
-  const whiteList = ["/", "/api"]; // 可通過的白名單
-  let url = req.url.split("?")[0]; // 去掉 query string 參數
-  if (whiteList.includes(url)) {
-    return next(); // 讓用戶通過
+// *** 刪除沒用到的已上傳的圖檔
+const removeUploadedImg = async (file) => {
+  const filePath = `public/img/avatar/${file}`;
+  try {
+    await fs.unlink(filePath);
+    return true;
+  } catch (ex) {
+    console.log("removeUploadedImg: ", ex);
   }
+  return false;
+};
 
-  /*
-  // 如果沒有登入管理者
-  if(!req.session.admin) {
-    return res.status(401).send(`<h1>登入管理者後, 才能訪問</h1>`)
+// 以主鍵取得項目資料
+const getItemById = async (id) => {
+  const output = {
+    success: false,
+    data: null,
+    error: "",
+  };
+  
+  const member_id = parseInt(id); // 轉換成整數 
+  if (!member_id || member_id < 1) {
+    output.error = "錯誤的編號";
+    return output;
   }
-  */
-  if (!req.session.admin) {
-    const usp = new URLSearchParams();
-    usp.set("u", req.originalUrl);
-    return res.redirect(`/login?${usp}`); // 提示登入後要前往的頁面
+ 
+  const r_sql = `SELECT member.name, memeber_profile.* FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id  WHERE member_id=? `;
+  const [rows] = await db.query(r_sql, [member_id]);
+  if (!rows.length) {
+    output.error = "沒有該筆資料";
+    return output;
   }
-  next();
-});
+  output.data = rows[0];
+  output.success = true;
+  return output;
+};
+
 
 // ******************** API ****************************
 router.post("/api", async (req, res) => {
@@ -69,7 +58,7 @@ router.post("/api", async (req, res) => {
   };
 
   let { email, password } = req.body;
-  const zResult = abSchema.safeParse(req.body);
+  const zResult = rgstSchema.safeParse(req.body);
   // 如果資料驗證沒過
   if (!zResult.success) {
     return res.json(zResult);
@@ -131,74 +120,71 @@ router.post("/api", async (req, res) => {
   res.json(output);
 });
 
-// router.put("/api/:member_id", upload.single("avatar"), async (req, res) => {
-//   const output = {
-//     success: false,
-//     bodyData: req.body,
-//     result: null,
-//     error: "",
-//   };
+router.put("/api/profile", upload.single("avatar"), async (req, res) => {
+  
+  const output = {
+    success: false,
+    bodyData: req.body,
+    result: null,
+    error: "",
+  };
 
-//   // 先取到原本的項目資料
-//   const {
-//     success,
-//     error,
-//     data: originalData,
-//   } = await getItemById(req.params.ab_id);
-//   if (!success) {
-//     output.error = error;
-//     return res.json(output);
-//   }
+  // 先取到原本的項目資料
+  const {
+    success,
+    error,
+    data: originalData,
+  } = await getItemById(req.my_jwt?.id);
+  if (!success) {
+    output.error = error;
+    return res.json(output);
+  }
 
-//   // 表單資料
-//   let { name, email, mobile, birthday, address } = req.body;
+  // 表單資料
+  req.body.status = req.body.status ? 1 : 0;
+  let { name, avatar, sex, mobile, intro, item, goal, status } = req.body;
 
-//   // 表單驗證
-//   const zResult = abSchema.safeParse(req.body);
-//   // 如果資料驗證沒過
-//   if (!zResult.success) {
-//     if (req.file?.filename) {
-//       removeUploadedImg(req.file.filename);
-//     }
-//     return res.json(zResult);
-//   }
+  // 表單驗證
+  const zResult = pfSchema.safeParse(req.body);
+  // 如果資料驗證沒過
+  if (!zResult.success) {
+    if (req.file?.filename) {
+      removeUploadedImg(req.file.filename);
+    }
+    return res.json(zResult);
+  }
 
-//   // 處理 birthday 沒有填寫的情況
-//   if (birthday === undefined) {
-//     birthday = null;
-//   } else {
-//     const b = moment(birthday);
-//     if (b.isValid()) {
-//       birthday = b.format(dateFormat);
-//     } else {
-//       birthday = null;
-//     }
-//   }
 
-//   const dataObj = { name, email, mobile, birthday, address };
-//   // 判斷有沒有上傳頭貼
-//   if (req.file?.filename) {
-//     dataObj.avatar = req.file.filename;
-//   }
+  const dataObj = { avatar, sex, mobile, intro, item, goal, status };
+  // 判斷有沒有上傳頭貼
+  if (req.file?.filename) {
+    dataObj.avatar = req.file.filename;
+  }
 
-//   const sql = `
-//     UPDATE address_book SET ? WHERE ab_id=?;
-//   `;
-//   try {
-//     const [result] = await db.query(sql, [dataObj, originalData.ab_id]);
-//     output.result = result;
-//     output.success = !!result.changedRows;
-//     // 判斷有沒有上傳頭貼, 有的話刪掉之前的頭貼
-//     if (req.file?.filename) {
-//       removeUploadedImg(originalData.avatar);
-//     }
-//   } catch (ex) {
-//     if (req.file?.filename) {
-//       removeUploadedImg(req.file.filename);
-//     }
-//     output.ex = ex;
-//   }
+  const sql1 = `
+    UPDATE member_profile SET ? WHERE member_id=?;
+  `;
+  
+  const sql2 = `
+    UPDATE member SET name=? WHERE member_id=?;
+  `;
+  try {
+    const [result1] = await db.query(sql1, [dataObj, originalData.member_id]);
+    const [result2] = await db.query(sql2, [name, originalData.member_id]);
+    
+    output.result = {result1, result2};
+    output.success = !!(result1.changedRows || result2.changedRows);
+    // 判斷有沒有上傳頭貼, 有的話刪掉之前的頭貼
+    if (req.file?.filename) {
+      removeUploadedImg(originalData.avatar);
+    }
+  } catch (ex) {
+    if (req.file?.filename) {
+      removeUploadedImg(req.file.filename);
+    }
+    output.ex = ex;
+  }
 
-//   res.json(output);
-// });
+  res.json(output);
+});
 export default router;
