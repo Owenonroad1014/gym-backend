@@ -8,56 +8,7 @@ import upload from "./../utils/upload-images.js";
 const coachesRouter = express.Router();
 const dateFormat = "YYYY-MM-DD";
 
-// const getListData = async (req) => {
-//   const output = {
-//     success: false,
-//     redirect: undefined,
-//     perPage: 30,
-//     totalRows: 0,
-//     totalPages: 0,
-//     page: 0,
-//     rows: [],
-//     keyword: "",
-//   };
-
-//   // 取得查詢參數
-//   const { location, branch, keyword } = req.query;
-
-//   let where = " WHERE 1 ";
-//   if (location) {
-//     where += ` AND location = ${db.escape(location)}`;
-//   }
-//   if (branch) {
-//     where += ` AND branch = ${db.escape(branch)}`;
-//   }
-//   if (keyword) {
-//     where += ` AND (name LIKE ${db.escape(`%${keyword}%`)})`;
-//   }
-
-//   // 查詢總筆數
-//   const [[{ totalRows }]] = await db.query(
-//     `SELECT COUNT(1) totalRows FROM coaches ${where}`
-//   );
-
-//   if (totalRows > 0) {
-//     // 有資料時，取得分頁資料
-//     const totalPages = Math.ceil(totalRows / output.perPage);
-//     const page = parseInt(req.query.page) || 1;
-//     const limitStart = (page - 1) * output.perPage;
-
-//     const [rows] = await db.query(
-//       `SELECT * FROM coaches ${where} LIMIT ${limitStart}, ${output.perPage}`
-//     );
-
-//     output.success = true;
-//     output.totalPages = totalPages;
-//     output.page = page;
-//     output.rows = rows;
-//   }
-
-//   return output;
-// };
-
+// 取得教練列表資料
 const getListData = async (req) => {
   const output = {
     success: false,
@@ -68,6 +19,7 @@ const getListData = async (req) => {
     page: 0,
     rows: [],
     keyword: "",
+    error: "",
   };
 
   try {
@@ -112,6 +64,10 @@ const getListData = async (req) => {
       output.page = parseInt(page);
       output.rows = rows.map(({total_count, ...row}) => row);
       output.keyword = keyword || "";
+    }
+    // 檢查是否有符合查詢條件的教練
+    if (output.totalRows === 0) {
+      output.error = "沒有教練資料";
     }
 
     return output;
@@ -194,6 +150,8 @@ const getCalendarData = async (req) => {
         `SELECT 
             classes.*,
             coaches.name as coach_name,
+            locations.location,
+            locations.branch,
             class_types.type_name as title,
             DATE_FORMAT(class_date, '%Y-%m-%d') as class_date,
             TIME_FORMAT(start_time, '%H:%i') as start_time,
@@ -201,6 +159,7 @@ const getCalendarData = async (req) => {
             FROM classes 
             LEFT JOIN coaches ON classes.coach_id = coaches.id
             LEFT JOIN class_types ON classes.type_id = class_types.id
+            LEFT JOIN locations ON classes.location_id = locations.id
             WHERE classes.coach_id = ?
             GROUP BY classes.id
             ORDER BY classes.class_date ASC, classes.start_time ASC
