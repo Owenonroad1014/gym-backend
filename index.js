@@ -316,7 +316,7 @@ app.post("/login-jwt", async (req, res) => {
   output.data = {
     id: row.member_id,
     account: row.email,
-    // avatar: avatarUrl,
+    // avatar:row.avatar,
     token,
   };
   res.json(output);
