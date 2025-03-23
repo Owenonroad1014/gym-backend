@@ -165,7 +165,8 @@ router.get("/api", async (req, res) => {
 
 router.get("/api/:productId", async (req, res) => {
   const productId = req.params.productId;
-  const output = { success: false, data: null, relatedProducts: [] };
+  const memberId = req.my_jwt?.id; 
+  const output = { success: false, data: null, relatedProducts: [] ,like_id : null, memberId : memberId};
 
   try {
     const sql = `
@@ -193,6 +194,8 @@ router.get("/api/:productId", async (req, res) => {
 
     if (rows.length > 0) {
       let productData = rows[0];
+      console.log();
+      
 
       // 檢查所有 variants 是否 weight 為 null
       let hasValidVariants = productData.variants.some(variant => variant.weight !== null);
@@ -214,6 +217,13 @@ router.get("/api/:productId", async (req, res) => {
 
       const [relatedRows] = await db.query(relatedSql, [productData.category_name, productId]);
       output.relatedProducts = relatedRows;
+
+      if (memberId) {
+        const likeSql = `SELECT like_id FROM Favorites WHERE member_id = ? AND product_id = ?`;
+        const [likeRows] = await db.query(likeSql, [memberId, productId]);
+        console.log(likeRows);
+        output.like_id = likeRows.length > 0 ? likeRows[0].like_id : false;
+      }
     }
   } catch (error) {
     output.error = error.message;
