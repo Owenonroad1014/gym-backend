@@ -16,6 +16,8 @@ import productsRouter from "./routes/products.js";
 import articlesRouter from "./routes/articles.js";
 import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
+import locationsRouter from "./routes/locations.js";
+import registerRouter from "./routes/register.js";
 import chatsRouter from "./routes/chats.js";
 
 
