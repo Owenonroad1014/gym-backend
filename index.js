@@ -18,6 +18,9 @@ import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
+import chatsRouter from "./routes/chats.js";
+
+
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
 
@@ -84,6 +87,7 @@ app.use("/classes", classesRouter);
 app.use("/articles", articlesRouter);
 app.use("/friends", friendsRouter);
 app.use("/locations", locationsRouter);
+
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
