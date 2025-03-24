@@ -45,6 +45,8 @@ const getListData = async (req) => {
     keyword: ""
   };
 
+  const memberId = req.my_jwt?.id; 
+
   const perPage = output.perPage;
   let page = +req.query.page || 1;
   let keyword = req.query.keyword ? req.query.keyword.trim() : "";
@@ -67,42 +69,55 @@ const getListData = async (req) => {
     let category_ = db.escape(category); // 確保 category 是安全的
     where += ` AND (c.category_name = ${category_})`;
 }
-
+  // 取得總筆數
   const t_sql = `  SELECT COUNT(1) AS totalRows 
   FROM products p 
   JOIN Categories c ON p.category_id = c.id 
   ${where} `;
-  const [[{ totalRows }]] = await db.query(t_sql); // 取得總筆數
+  const [[{ totalRows }]] = await db.query(t_sql); 
+
+  // 計算總頁數
   const totalPages = Math.ceil(totalRows / perPage);
+
   let rows = [];
+  // 確保頁碼不超過總頁數
   if (totalRows) {
     if (page > totalPages) {
       output.redirect = `?page=${totalPages}`;
       return output;
     }
 
-    const sql = `SELECT     
-    p.id,
-    p.product_code,
-    p.name AS product_name,
-    p.description,
-    c.category_name,
-    p.price,
-    p.image_url,
-    p.average_rating,
-    p.created_at 
-    FROM Products p 
-    JOIN Categories c ON p.category_id = c.id
-    ${where} 
-    ORDER BY id 
-    LIMIT ${
-      (page - 1) * perPage
-    }, ${perPage}`;
+
+
+    if (memberId) {
+      const sql = `
+      SELECT p.id, p.product_code, p.name AS product_name, p.description, 
+      c.category_name, p.price, p.image_url, p.average_rating, 
+      p.created_at, l.like_id
+        FROM Products p LEFT JOIN (
+        SELECT * FROM favorites WHERE member_id = ${memberId}
+        )l ON p.id = l.product_id left
+        JOIN Categories c ON p.category_id = c.id
+        ${where} 
+        ORDER BY p.id 
+        LIMIT ${(page - 1) * perPage}, ${perPage}
+  `;[rows] = await db.query(sql);}
+      else{let sql = `
+        SELECT p.id, p.product_code, p.name AS product_name, p.description, 
+        c.category_name, p.price, p.image_url, p.average_rating, 
+        p.created_at
+        FROM Products p
+        JOIN Categories c ON p.category_id = c.id
+        ${where} 
+        ORDER BY p.id 
+        LIMIT ${(page - 1) * perPage}, ${perPage}
+    `;
+
     [rows] = await db.query(sql);
   }
-
+    
   return { ...output, totalRows, totalPages, page, rows, success: true };
-};
+};}
 
 router.use((req, res, next) => {
   return next(); // 先讓 middleware 內容沒有功能
@@ -133,11 +148,6 @@ router.get("/", async (req, res) => {
     // 如果有指示要跳轉, 就跳轉到指示的 URL
     return res.redirect(data.redirect);
   }
-  if(data.rows.length){
-    res.render("products/list", data);
-  } else {
-    res.render("products/list-no-data", data);
-  }
   
 });
 
@@ -150,6 +160,76 @@ router.get("/add", async(req, res) => {
 router.get("/api", async (req, res) => {
   const data = await getListData(req);
   res.json(data);
+  console.log("Request body:", req.body);
+});
+
+router.get("/api/:productId", async (req, res) => {
+  const productId = req.params.productId;
+  const memberId = req.my_jwt?.id; 
+  const output = { success: false, data: null, relatedProducts: [] ,like_id : null, memberId : memberId};
+
+  try {
+    const sql = `
+      SELECT p.id, 
+      p.product_code, 
+      p.name AS product_name, 
+      p.description, 
+      c.category_name, 
+      p.price, 
+      p.image_url, 
+      p.average_rating, 
+      p.created_at,
+      JSON_ARRAYAGG(
+        JSON_OBJECT('variant_id', pv.id, 'weight', pv.weight, 'image_url', pv.image_url)
+      ) AS variants
+      FROM Products p
+      JOIN Categories c ON p.category_id = c.id
+      LEFT JOIN ProductVariants pv ON p.id = pv.product_id
+      WHERE p.id = ?
+      GROUP BY p.id, p.product_code, p.name, p.description, c.category_name, 
+         p.price, p.image_url, p.average_rating, p.created_at;
+    `;
+
+    const [rows] = await db.query(sql, [productId]);
+
+    if (rows.length > 0) {
+      let productData = rows[0];
+      console.log();
+      
+
+      // 檢查所有 variants 是否 weight 為 null
+      let hasValidVariants = productData.variants.some(variant => variant.weight !== null);
+
+      // 如果所有 weight 都是 null，就設為 null
+      productData.variants = hasValidVariants ? productData.variants : null;
+
+      output.success = true;
+      output.data = productData;
+
+      // 取得相關產品
+      const relatedSql = `
+        SELECT p.id, p.name AS product_name, p.price, p.image_url, p.description
+        FROM Products p
+        JOIN Categories c ON p.category_id = c.id
+        WHERE c.category_name = ? AND p.id != ?
+        LIMIT 4;
+      `;
+
+      const [relatedRows] = await db.query(relatedSql, [productData.category_name, productId]);
+      output.relatedProducts = relatedRows;
+
+      if (memberId) {
+        const likeSql = `SELECT like_id FROM Favorites WHERE member_id = ? AND product_id = ?`;
+        const [likeRows] = await db.query(likeSql, [memberId, productId]);
+        console.log(likeRows);
+        output.like_id = likeRows.length > 0 ? likeRows[0].like_id : false;
+      }
+    }
+  } catch (error) {
+    output.error = error.message;
+  }
+  
+  res.json(output);
 });
 
 router.post("/api", upload.single('avatar'), async (req, res) => {
@@ -195,4 +275,56 @@ router.post("/api", upload.single('avatar'), async (req, res) => {
 
 // CORS 設置應該只需要一次
 });
+//收藏api
+router.get("/api/toggle-like/:productId", async (req, res) => {
+  // 會員 : req.session.admin.member_id
+  const output = {
+    success: false, // 有沒有成功完成操作
+    action: "", // add, remove // 5. 回應時: "加入" 或 "移除", 哪一個項目
+    product_id: 0, // 操作的項目是哪一個
+    error: "",
+  };
+
+  const member_id = req.my_jwt?.id; // 使用 JWT 登入功能
+  if (!member_id) {
+    output.error = "需要登入會員";
+    return res.json(output);
+  }
+  const product_id = +req.params.productId || 0;
+  if (!product_id) {
+    output.error = "項目編號必須是整數";
+    return res.json(output);
+  }
+
+console.log("Member ID:", member_id);
+console.log("Product ID:", product_id);
+
+  const sql = `
+    select memberlike.like_id from products left join (SELECT * FROM favorites WHERE member_id=?) memberlike on products.id = memberlike.product_id WHERE products.id =?;
+      `;
+  const [rows] = await db.query(sql, [member_id, product_id]);
+  if (!rows.length) {
+    output.error = "沒有該項目";
+    return res.json(output);
+  }
+  output.product_id = product_id;
+  const like_id = rows[0].like_id;
+  if (like_id) {
+    // 3. 有, 就移除
+    output.action = "remove";
+    const sql = `DELETE FROM favorites WHERE like_id=?`;
+    const [result] = await db.query(sql, [like_id]);
+    output.result = result;
+    output.success = !!result.affectedRows;
+  } else {
+    // 4. 沒有, 就加入
+    output.action = "add";
+    const sql = `INSERT INTO favorites (member_id, product_id) VALUES (?, ?) `;
+    const [result] = await db.query(sql, [member_id, product_id]);
+    output.result = result;
+    output.success = !!result.affectedRows;
+  }
+  res.json(output);
+});
+
 export default router;
