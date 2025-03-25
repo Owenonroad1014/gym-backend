@@ -1,5 +1,5 @@
 import express from "express";
-import { rgstSchema,pfSchema } from  "../utils/schema/schema.js"
+import { rgSchema,pfSchema } from  "../utils/schema/schema.js"
 import db from "../utils/connect-mysql.js";
 import upload from "../utils/upload-images.js";
 import bcrypt from "bcrypt";
@@ -32,7 +32,7 @@ const getItemById = async (id) => {
     return output;
   }
  
-  const r_sql = `SELECT member.name, memeber_profile.* FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id  WHERE member_id=? `;
+  const r_sql = `SELECT member.name, member_profile.* FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id  WHERE member_profile.member_id=? `;
   const [rows] = await db.query(r_sql, [member_id]);
   if (!rows.length) {
     output.error = "沒有該筆資料";
@@ -58,12 +58,12 @@ router.post("/api", async (req, res) => {
   };
 
   let { email, password } = req.body;
-  const zResult = rgstSchema.safeParse(req.body);
+ 
+  const zResult = rgSchema.safeParse(req.body);
   // 如果資料驗證沒過
   if (!zResult.success) {
     return res.json(zResult);
   }
-
   /* zResult 結果
 {
     "success": false,
@@ -94,6 +94,7 @@ router.post("/api", async (req, res) => {
     output.error = "用戶已註冊";
     return res.json(output);
   }
+
 
   const hash = await bcrypt.hash(password, 10);
   const sql = `
@@ -141,8 +142,25 @@ router.put("/api/profile", upload.single("avatar"), async (req, res) => {
   }
 
   // 表單資料
-  req.body.status = req.body.status ? 1 : 0;
-  let { name, avatar, sex, mobile, intro, item, goal, status } = req.body;
+  
+  
+
+  let { pname: name, avatar, sex, mobile, intro, item, goal, status } = req.body;
+  
+
+// Convert item to array if it's a string
+if (typeof item === 'string' && item.length > 0) {
+  req.body.item = item.split(/[\s、,]+/).filter(s => s.length > 0);
+} else if (!Array.isArray(req.body.item)) {
+  req.body.item = [];
+}
+
+// Convert goal to array if it's a string
+if (typeof goal === 'string' && goal.length > 0) {
+  req.body.goal = goal.split(/[\s、,]+/).filter(s => s.length > 0);
+} else if (!Array.isArray(req.body.goal)) {
+  req.body.goal = [];
+}
 
   // 表單驗證
   const zResult = pfSchema.safeParse(req.body);
@@ -154,19 +172,39 @@ router.put("/api/profile", upload.single("avatar"), async (req, res) => {
     return res.json(zResult);
   }
 
+  // 轉換布林值
+  req.body.status = req.body.status ? 1 : 0;
 
-  const dataObj = { avatar, sex, mobile, intro, item, goal, status };
+  const dataObj = { sex, mobile,status:req.body.status };
+
   // 判斷有沒有上傳頭貼
   if (req.file?.filename) {
     dataObj.avatar = req.file.filename;
+   
   }
+  
+  if (intro) {
+  dataObj.intro = intro;
+  }
+// Check if item is a non-empty array or has a string value
+if (item && (Array.isArray(item) && item.length > 0)) {
+  dataObj.item = dataObj.item.join(',')
+}
 
+
+// Check if goal is a non-empty array or has a string value
+if (goal && (!Array.isArray(goal) && goal.length > 0)) {
+  dataObj.item = dataObj.item.join(',')
+}
+ 
+    
+  
   const sql1 = `
-    UPDATE member_profile SET ? WHERE member_id=?;
+    UPDATE member_profile SET ? WHERE member_profile.member_id=?;
   `;
   
   const sql2 = `
-    UPDATE member SET name=? WHERE member_id=?;
+    UPDATE member SET name=? WHERE member.member_id=?;
   `;
   try {
     const [result1] = await db.query(sql1, [dataObj, originalData.member_id]);
