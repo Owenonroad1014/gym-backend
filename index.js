@@ -20,7 +20,7 @@ import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
 import chatsRouter from "./routes/chats.js";
-
+import gymfriendsRouter from "./routes/gymfriends.js";
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -89,7 +89,8 @@ app.use("/classes", classesRouter);
 app.use("/articles", articlesRouter);
 app.use("/friends", friendsRouter);
 app.use("/locations", locationsRouter);
-
+app.use("/gymfriends", gymfriendsRouter);
+app.use("/chats", chatsRouter);
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;

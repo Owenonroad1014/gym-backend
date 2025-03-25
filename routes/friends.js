@@ -42,16 +42,17 @@ const getFriendList = async (req) => {
                 output.redirect = `?page=${totalPages}`;
                 return output;
             }
-            // 獲取文章列表並檢查是否有收藏的資訊
             const sql = `
                 SELECT 
                     sub.member_id, 
                     sub.user1_id, 
                     sub.user2_id, 
+                    sub.user1_delete,
+                    sub.user2_delete,
                     m1.name AS user1_name, 
                     m2.name AS user2_name
                 FROM 
-                    (SELECT member_id, user1_id, user2_id 
+                    (SELECT member_id, user1_id, user2_id,friendships.user1_delete,friendships.user2_delete
                     FROM member
                     LEFT JOIN friendships 
                     ON member.member_id = friendships.user1_id 
@@ -111,6 +112,92 @@ router.delete("/api/delete", async (req, res) => {
             output.success = true;
             output.data = result;
             output.status = "成功刪除";
+            // 確認是否有聊天室
+            const sqlensure = `SELECT * FROM chats WHERE (user1_id = ? AND user2_id = ?)OR(user1_id = ? AND user2_id = ?);`;
+            const [ensure] = await db.query(sqlensure, [
+                member_id,
+                user,
+                user,
+                member_id,
+            ]);
+
+            if (ensure.length > 0) {
+                const deleteColumn =
+                    ensure[0].user1_id === member_id
+                        ? "user1_delete"
+                        : "user2_delete";
+                const sqlDeleteChat = `UPDATE chats SET ${deleteColumn} = 1 WHERE id = ?;`;
+                await db.query(sqlDeleteChat, [ensure[0].id]);
+            }
+        } else {
+            output.error = "未找到好友關係，無法刪除";
+        }
+        res.json(output);
+    } catch (err) {
+        output.error = "無法刪除";
+        res.json(output);
+    }
+});
+router.post("/api/delete", async (req, res) => {
+    const member_id = req.my_jwt?.id;
+    const { user } = req.body;
+    const output = {
+        success: false,
+        data: [],
+        error: "",
+    };
+    //  登入
+    if (!member_id) {
+        output.error = "需要登入會員";
+        return res.json(output);
+    }
+    // 好友
+    if (!user) {
+        output.error = "沒有此好友";
+        return res.json(output);
+    }
+    const sqlensure = `SELECT * FROM friendships WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id =?);`;
+    const [ensure] = await db.query(sqlensure, [
+        member_id,
+        user,
+        user,
+        member_id,
+    ]);
+    if(ensure.length <= 0){
+        output.error = "沒有此好友";
+        return res.json(output);
+    }
+    const updateColumn =
+            ensure[0].user1_id === member_id ? "user1_delete" : "user2_delete";
+    const sqlUpdate = `UPDATE friendships SET  ${updateColumn}=1  WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id =?);`
+    try {
+        const [result] = await db.query(sqlUpdate, [
+            member_id,
+            user,
+            user,
+            member_id,
+        ]);
+        if (result.affectedRows > 0) {
+            output.success = true;
+            output.data = result;
+            output.status = "成功刪除";
+            // 確認是否有聊天室
+            const sqlensure = `SELECT * FROM chats WHERE (user1_id = ? AND user2_id = ?)OR(user1_id = ? AND user2_id = ?);`;
+            const [ensure] = await db.query(sqlensure, [
+                member_id,
+                user,
+                user,
+                member_id,
+            ]);
+
+            if (ensure.length > 0) {
+                const deleteColumn =
+                    ensure[0].user1_id === member_id
+                        ? "user1_delete"
+                        : "user2_delete";
+                const sqlDeleteChat = `UPDATE chats SET ${deleteColumn} = 1 WHERE id = ?;`;
+                await db.query(sqlDeleteChat, [ensure[0].id]);
+            }
         } else {
             output.error = "未找到好友關係，無法刪除";
         }
@@ -173,10 +260,16 @@ router.post("/api/request", async (req, res) => {
         return res.json(output);
     }
     // 2. 有沒有這個項目
-    const sql = `SELECT * FROM  friend_requests WHERE sender_id=? AND receiver_id =?`;
+    const sql = `SELECT * FROM  friend_requests WHERE sender_id=? AND receiver_id =? AND (status="pending" OR status ="rejected")`;
     const [rows] = await db.query(sql, [member_id, receiver_id]);
     if (rows.length) {
         output.error = "已發送過請求";
+        return res.json(output);
+    }
+    const sqlaccept = `SELECT * FROM  friend_requests WHERE sender_id=? AND receiver_id =? AND status="accepted" `;
+    const [acceptrows] = await db.query(sqlaccept, [member_id, receiver_id]);
+    if (acceptrows.length) {
+        output.error = "已是好友";
         return res.json(output);
     }
     const sqlAdd = `INSERT INTO friend_requests (sender_id, receiver_id, status)
@@ -236,8 +329,8 @@ router.post("/api/accept", async (req, res) => {
                 sender_id,
             ]);
             const invitesql = `INSERT INTO messages (chat_id,sender_id,message) VALUES (?,?,'邀請你一起運動吧!!');`;
-            console.log(chat_id,sender_id);
-            
+            console.log(chat_id, sender_id);
+
             await db.query(invitesql, [chat_id, sender_id]);
             output.success = true;
             output.updateStatus = "已成為好友";
