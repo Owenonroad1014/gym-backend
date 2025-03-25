@@ -21,7 +21,8 @@ const getGYMFriendList = async (req) => {
     let page = +req.query.page || 1;
     let gender = req.query.gender;
     let category = req.query.category;
-    let where = ` WHERE status = 1 `;
+    // 排除自己
+    let where = ` WHERE status = 1 AND  member.member_id != ${member_id}`;
     if (!member_id) {
         output.error = "需要登入會員";
         return output;
