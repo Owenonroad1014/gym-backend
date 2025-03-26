@@ -1,5 +1,4 @@
 import express from "express";
-import moment from "moment-timezone";
 import fs from "node:fs/promises";
 import db from "../utils/connect-mysql.js";
 import upload from "../utils/upload-images.js";
@@ -61,7 +60,7 @@ const getListData = async (req) => {
   if (keyword) {
     output.keyword = keyword; // 要輸出給 EJS
     let keyword_ = db.escape(`%${keyword}%`);
-    where += ` AND (name LIKE ${keyword_})`;
+    where += ` AND (title LIKE ${keyword_})`;
   }
 
   if (category) {
@@ -71,8 +70,8 @@ const getListData = async (req) => {
 }
   // 取得總筆數
   const t_sql = `  SELECT COUNT(1) AS totalRows 
-  FROM products p 
-  JOIN Categories c ON p.category_id = c.id 
+  FROM videos v 
+  JOIN videos_categories c ON v.category_id = c.id 
   ${where} `;
   const [[{ totalRows }]] = await db.query(t_sql); 
 
@@ -91,25 +90,25 @@ const getListData = async (req) => {
 
     if (memberId) {
       const sql = `
-      SELECT p.id, p.product_code, p.name AS product_name, p.description, 
-      c.category_name, p.price, p.image_url, p.average_rating, 
-      p.created_at, l.like_id
-        FROM Products p LEFT JOIN (
-        SELECT * FROM favorites WHERE member_id = ${memberId}
-        )l ON p.id = l.product_id left
-        JOIN Categories c ON p.category_id = c.id
+      SELECT v.id, v.title AS video_title, v.description, 
+      c.category_name, v.url, 
+      v.created_at, l.like_id
+        FROM videos v LEFT JOIN (
+        SELECT * FROM video_favorites WHERE member_id = ${memberId}
+        )l ON v.id = l.video_id left
+        JOIN videos_categories c ON v.category_id = c.id
         ${where} 
-        ORDER BY p.id 
+        ORDER BY v.id 
         LIMIT ${(page - 1) * perPage}, ${perPage}
   `;[rows] = await db.query(sql);}
       else{let sql = `
-        SELECT p.id, p.product_code, p.name AS product_name, p.description, 
-        c.category_name, p.price, p.image_url, p.average_rating, 
-        p.created_at
-        FROM Products p
-        JOIN Categories c ON p.category_id = c.id
+        SELECT v.id, v.title AS video_title, v.description, 
+        c.category_name, v.url, 
+        v.created_at
+        FROM videos v
+        JOIN videos_categories c ON v.category_id = c.id
         ${where} 
-        ORDER BY p.id 
+        ORDER BY v.id 
         LIMIT ${(page - 1) * perPage}, ${perPage}
     `;
 
@@ -141,7 +140,7 @@ router.use((req, res, next) => {
 });
 
 router.get("/", async (req, res) => {
-  res.locals.pageName = "products-list";
+  res.locals.pageName = "videos-list";
 
   const data = await getListData(req);
   if (data.redirect) {
@@ -150,9 +149,6 @@ router.get("/", async (req, res) => {
   }
   
 });
-
-
-
 
 // router.get("/add", async(req, res) => {
 //   res.locals.title = "新增通訊錄 - " + res.locals.title;
@@ -166,177 +162,10 @@ router.get("/api", async (req, res) => {
   console.log("Request body:", req.body);
 });
 
-//商品評價(讀取訂購資料)
-router.get("/api/review", async (req, res) => {
-  const memberId = req.my_jwt?.id;
-  if (!memberId) {
-    return res.json({ success: false, error: "需要登入會員" });
-  }
-
-  const sql = `
-      SELECT 
-          o.order_id, oi.product_id, p.name, p.image_url, 
-          oi.product_variant_id, o.added_at, pv.weight, o.status,oi.order_item_id,
-          r.rating, r.review_text  -- 加入評論的數據
-      FROM orders o
-      JOIN order_items oi ON o.order_id = oi.order_id  -- 訂單主表與詳情表連接
-      JOIN products p ON oi.product_id = p.id  -- 取得產品資訊
-      LEFT JOIN productvariants pv ON oi.product_variant_id = pv.id  -- 取得變體資訊
-      LEFT JOIN product_reviews r 
-          ON oi.product_id = r.product_id 
-          AND r.member_id = ?  -- 確保查詢當前會員的評論
-      WHERE o.member_id = ? AND o.status = '已歸還'
-      ORDER BY o.added_at DESC;
-  `;
-
-  try {
-    const [rows] = await db.query(sql, [memberId, memberId]);
-    return res.json({ success: true, products: rows });
-  } catch (error) {
-    return res.json({ success: false, error: error.message });
-  }
-});
-
-//商品評價(讀取尚未評價資料)
-router.get("/api/review/pending", async (req, res) => {
-  const memberId = req.my_jwt?.id;
-  if (!memberId) {
-    return res.json({ success: false, error: "需要登入會員" });
-  }
-
-  const sql = `
-      SELECT 
-          o.order_id, oi.product_id, p.name, p.image_url, 
-          oi.product_variant_id, o.added_at, pv.weight, o.status
-      FROM orders o
-      JOIN order_items oi ON o.order_id = oi.order_id  -- 連接訂單詳情表
-      JOIN products p ON oi.product_id = p.id  -- 取得產品資訊
-      LEFT JOIN productvariants pv ON oi.product_variant_id = pv.id  -- 取得變體資訊
-      LEFT JOIN product_reviews r 
-          ON oi.product_id = r.product_id 
-          AND r.member_id = ?  -- 確保只查詢當前會員的評論
-      WHERE o.member_id = ? 
-        AND o.status = '已歸還'  -- 只顯示已歸還的訂單
-        AND r.product_id IS NULL  -- 只有未評論的商品才會出現在這裡
-      ORDER BY o.added_at DESC;
-  `;
-
-  try {
-    const [rows] = await db.query(sql, [memberId, memberId]);
-    return res.json({ success: true, products: rows });
-  } catch (error) {
-    return res.json({ success: false, error: error.message });
-  }
-});
-
-
-
-
-//商品評價(新增商品評價)
-router.post("/api/add-review", async (req, res) => {
-  const { product_id, rating, review_text } = req.body;
-  const member_id = req.my_jwt?.id;
-  
-  if (!member_id) return res.status(401).json({ success: false, error: "未登入" });
-  if (!product_id || !rating) return res.status(400).json({ success: false, error: "缺少必要參數" });
-
-  try {
-      // 確保該會員真的租過這個商品
-      const [orderCheck] = await db.query(
-        `SELECT 1 FROM orders o 
-         JOIN order_items oi ON o.order_id = oi.order_id
-         WHERE o.member_id = ? AND oi.product_id = ? AND o.status = '已歸還'
-         LIMIT 1`, 
-        [member_id, product_id]
-      );
-
-      if (orderCheck.length === 0) {
-        return res.status(403).json({ success: false, error: "無法評論未租借過的商品" });
-      }
-
-      // 插入新的評價
-      await db.query(
-        `INSERT INTO product_reviews (member_id, product_id, rating, review_text, created_at) 
-         VALUES (?, ?, ?, ?, NOW())`, 
-        [member_id, product_id, rating, review_text]
-      );
-
-      // 重新計算該商品的平均星等
-      await db.query(
-        `UPDATE products p 
-         SET p.average_rating = (SELECT AVG(rating) FROM product_reviews WHERE product_id = ?) 
-         WHERE p.id = ?`, 
-        [product_id, product_id]
-      );
-
-      res.json({ success: true });
-  } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-
-//商品評價(編輯商品評價)
-router.post("/api/edit-review", async (req, res) => {
-  const { product_id, rating, review_text } = req.body;
-  const memberId = req.my_jwt?.id;
-
-  if (!memberId) return res.status(401).json({ success: false, error: "未登入" });
-  if (!product_id || !rating) return res.status(400).json({ success: false, error: "缺少必要參數" });
-
-  try {
-    // 檢查用戶是否有這筆商品租借且訂單已歸還
-    const checkSql = `
-      SELECT oi.product_id
-      FROM orders o
-      JOIN order_items oi ON o.order_id = oi.order_id
-      WHERE o.member_id = ? AND oi.product_id = ? AND o.status = '已歸還'
-    `;
-    const [rentedItems] = await db.query(checkSql, [memberId, product_id]);
-
-    if (rentedItems.length === 0) {
-      return res.status(400).json({ success: false, error: "該商品尚未租借或未歸還，無法編輯評論" });
-    }
-
-    // 確保評論已存在
-    const [existingReviews] = await db.query(
-      "SELECT id FROM product_reviews WHERE member_id = ? AND product_id = ?",
-      [memberId, product_id]
-    );
-
-    if (existingReviews.length === 0) {
-      return res.status(400).json({ success: false, error: "評論不存在，無法編輯" });
-    }
-
-    // 更新評論
-    await db.query(
-      "UPDATE product_reviews SET rating = ?, review_text = ? WHERE member_id = ? AND product_id = ?",
-      [rating, review_text, memberId, product_id]
-    );
-
-    // 重新計算該商品的平均星等
-    await db.query(
-      "UPDATE products SET average_rating = (SELECT AVG(rating) FROM product_reviews WHERE product_id = ?) WHERE id = ?",
-      [product_id, product_id]
-    );
-
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-
-
 router.get("/api/:productId", async (req, res) => {
   const productId = req.params.productId;
-  if (!/^\d+$/.test(productId)) {
-    return res.json({ success: false, error: "無效的商品 ID" });
-  }
   const memberId = req.my_jwt?.id; 
   const output = { success: false, data: null, relatedProducts: [] ,like_id : null, memberId : memberId};
-
-
 
   try {
     const sql = `
@@ -446,12 +275,12 @@ router.post("/api", upload.single('avatar'), async (req, res) => {
 // CORS 設置應該只需要一次
 });
 //收藏api
-router.get("/api/toggle-like/:productId", async (req, res) => {
+router.get("/api/toggle-like/:videoId", async (req, res) => {
   // 會員 : req.session.admin.member_id
   const output = {
     success: false, // 有沒有成功完成操作
     action: "", // add, remove // 5. 回應時: "加入" 或 "移除", 哪一個項目
-    product_id: 0, // 操作的項目是哪一個
+    video_id: 0, // 操作的項目是哪一個
     error: "",
   };
 
@@ -460,66 +289,41 @@ router.get("/api/toggle-like/:productId", async (req, res) => {
     output.error = "需要登入會員";
     return res.json(output);
   }
-  const product_id = +req.params.productId || 0;
-  if (!product_id) {
+  const video_id = +req.params.videoId || 0;
+  if (!video_id) {
     output.error = "項目編號必須是整數";
     return res.json(output);
   }
 
 console.log("Member ID:", member_id);
-console.log("Product ID:", product_id);
+console.log("video ID:", video_id);
 
   const sql = `
-    select memberlike.like_id from products left join (SELECT * FROM favorites WHERE member_id=?) memberlike on products.id = memberlike.product_id WHERE products.id =?;
+    select memberlike.like_id from videos left join (SELECT * FROM video_favorites WHERE member_id=?) memberlike on videos.id = memberlike.video_id WHERE videos.id =?;
       `;
-  const [rows] = await db.query(sql, [member_id, product_id]);
+  const [rows] = await db.query(sql, [member_id, video_id]);
   if (!rows.length) {
     output.error = "沒有該項目";
     return res.json(output);
   }
-  output.product_id = product_id;
+  output.video_id = video_id;
   const like_id = rows[0].like_id;
   if (like_id) {
     // 3. 有, 就移除
     output.action = "remove";
-    const sql = `DELETE FROM favorites WHERE like_id=?`;
+    const sql = `DELETE FROM video_favorites WHERE like_id=?`;
     const [result] = await db.query(sql, [like_id]);
     output.result = result;
     output.success = !!result.affectedRows;
   } else {
     // 4. 沒有, 就加入
     output.action = "add";
-    const sql = `INSERT INTO favorites (member_id, product_id) VALUES (?, ?) `;
-    const [result] = await db.query(sql, [member_id, product_id]);
+    const sql = `INSERT INTO video_favorites (member_id, video_id) VALUES (?, ?) `;
+    const [result] = await db.query(sql, [member_id, video_id]);
     output.result = result;
     output.success = !!result.affectedRows;
   }
   res.json(output);
 });
-
-
-
-router.get("/api/review", async (req, res) => {
-  const memberId = req.my_jwt?.id;
-  if (!memberId) {
-      return res.json({ success: false, error: "需要登入會員" });
-  }
-
-  const sql = `
-      SELECT o.product_id, p.name, p.image_url
-      FROM shop_orders o
-      JOIN products p ON o.product_id = p.id
-      WHERE o.member_id = ? AND o.status = '已歸還'
-      ORDER BY added_at DESC;
-  `;
-
-  try {
-    const [rows] = await db.query(sql, [memberId]);
-    if (rows.length === 0) {
-      return res.json({ success: true, products: [] });}
-    res.json({ success: true, products: rows });
-} catch (error) {
-    res.json({ success: false, error: error.message });
-}});
 
 export default router;
