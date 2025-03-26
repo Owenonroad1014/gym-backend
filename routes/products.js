@@ -151,11 +151,14 @@ router.get("/", async (req, res) => {
   
 });
 
-router.get("/add", async(req, res) => {
-  res.locals.title = "新增通訊錄 - " + res.locals.title;
-  res.locals.pageName = "products-add";
-  res.render("products/add");
-})
+
+
+
+// router.get("/add", async(req, res) => {
+//   res.locals.title = "新增通訊錄 - " + res.locals.title;
+//   res.locals.pageName = "products-add";
+//   res.render("products/add");
+// })
 
 router.get("/api", async (req, res) => {
   const data = await getListData(req);
@@ -163,10 +166,177 @@ router.get("/api", async (req, res) => {
   console.log("Request body:", req.body);
 });
 
+//商品評價(讀取訂購資料)
+router.get("/api/review", async (req, res) => {
+  const memberId = req.my_jwt?.id;
+  if (!memberId) {
+    return res.json({ success: false, error: "需要登入會員" });
+  }
+
+  const sql = `
+      SELECT 
+          o.order_id, oi.product_id, p.name, p.image_url, 
+          oi.product_variant_id, o.added_at, pv.weight, o.status,oi.order_item_id,
+          r.rating, r.review_text  -- 加入評論的數據
+      FROM orders o
+      JOIN order_items oi ON o.order_id = oi.order_id  -- 訂單主表與詳情表連接
+      JOIN products p ON oi.product_id = p.id  -- 取得產品資訊
+      LEFT JOIN productvariants pv ON oi.product_variant_id = pv.id  -- 取得變體資訊
+      LEFT JOIN product_reviews r 
+          ON oi.product_id = r.product_id 
+          AND r.member_id = ?  -- 確保查詢當前會員的評論
+      WHERE o.member_id = ? AND o.status = '已歸還'
+      ORDER BY o.added_at DESC;
+  `;
+
+  try {
+    const [rows] = await db.query(sql, [memberId, memberId]);
+    return res.json({ success: true, products: rows });
+  } catch (error) {
+    return res.json({ success: false, error: error.message });
+  }
+});
+
+//商品評價(讀取尚未評價資料)
+router.get("/api/review/pending", async (req, res) => {
+  const memberId = req.my_jwt?.id;
+  if (!memberId) {
+    return res.json({ success: false, error: "需要登入會員" });
+  }
+
+  const sql = `
+      SELECT 
+          o.order_id, oi.product_id, p.name, p.image_url, 
+          oi.product_variant_id, o.added_at, pv.weight, o.status
+      FROM orders o
+      JOIN order_items oi ON o.order_id = oi.order_id  -- 連接訂單詳情表
+      JOIN products p ON oi.product_id = p.id  -- 取得產品資訊
+      LEFT JOIN productvariants pv ON oi.product_variant_id = pv.id  -- 取得變體資訊
+      LEFT JOIN product_reviews r 
+          ON oi.product_id = r.product_id 
+          AND r.member_id = ?  -- 確保只查詢當前會員的評論
+      WHERE o.member_id = ? 
+        AND o.status = '已歸還'  -- 只顯示已歸還的訂單
+        AND r.product_id IS NULL  -- 只有未評論的商品才會出現在這裡
+      ORDER BY o.added_at DESC;
+  `;
+
+  try {
+    const [rows] = await db.query(sql, [memberId, memberId]);
+    return res.json({ success: true, products: rows });
+  } catch (error) {
+    return res.json({ success: false, error: error.message });
+  }
+});
+
+
+
+
+//商品評價(新增商品評價)
+router.post("/api/add-review", async (req, res) => {
+  const { product_id, rating, review_text } = req.body;
+  const member_id = req.my_jwt?.id;
+  
+  if (!member_id) return res.status(401).json({ success: false, error: "未登入" });
+  if (!product_id || !rating) return res.status(400).json({ success: false, error: "缺少必要參數" });
+
+  try {
+      // 確保該會員真的租過這個商品
+      const [orderCheck] = await db.query(
+        `SELECT 1 FROM orders o 
+         JOIN order_items oi ON o.order_id = oi.order_id
+         WHERE o.member_id = ? AND oi.product_id = ? AND o.status = '已歸還'
+         LIMIT 1`, 
+        [member_id, product_id]
+      );
+
+      if (orderCheck.length === 0) {
+        return res.status(403).json({ success: false, error: "無法評論未租借過的商品" });
+      }
+
+      // 插入新的評價
+      await db.query(
+        `INSERT INTO product_reviews (member_id, product_id, rating, review_text, created_at) 
+         VALUES (?, ?, ?, ?, NOW())`, 
+        [member_id, product_id, rating, review_text]
+      );
+
+      // 重新計算該商品的平均星等
+      await db.query(
+        `UPDATE products p 
+         SET p.average_rating = (SELECT AVG(rating) FROM product_reviews WHERE product_id = ?) 
+         WHERE p.id = ?`, 
+        [product_id, product_id]
+      );
+
+      res.json({ success: true });
+  } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+//商品評價(編輯商品評價)
+router.post("/api/edit-review", async (req, res) => {
+  const { product_id, rating, review_text } = req.body;
+  const memberId = req.my_jwt?.id;
+
+  if (!memberId) return res.status(401).json({ success: false, error: "未登入" });
+  if (!product_id || !rating) return res.status(400).json({ success: false, error: "缺少必要參數" });
+
+  try {
+    // 檢查用戶是否有這筆商品租借且訂單已歸還
+    const checkSql = `
+      SELECT oi.product_id
+      FROM orders o
+      JOIN order_items oi ON o.order_id = oi.order_id
+      WHERE o.member_id = ? AND oi.product_id = ? AND o.status = '已歸還'
+    `;
+    const [rentedItems] = await db.query(checkSql, [memberId, product_id]);
+
+    if (rentedItems.length === 0) {
+      return res.status(400).json({ success: false, error: "該商品尚未租借或未歸還，無法編輯評論" });
+    }
+
+    // 確保評論已存在
+    const [existingReviews] = await db.query(
+      "SELECT id FROM product_reviews WHERE member_id = ? AND product_id = ?",
+      [memberId, product_id]
+    );
+
+    if (existingReviews.length === 0) {
+      return res.status(400).json({ success: false, error: "評論不存在，無法編輯" });
+    }
+
+    // 更新評論
+    await db.query(
+      "UPDATE product_reviews SET rating = ?, review_text = ? WHERE member_id = ? AND product_id = ?",
+      [rating, review_text, memberId, product_id]
+    );
+
+    // 重新計算該商品的平均星等
+    await db.query(
+      "UPDATE products SET average_rating = (SELECT AVG(rating) FROM product_reviews WHERE product_id = ?) WHERE id = ?",
+      [product_id, product_id]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
 router.get("/api/:productId", async (req, res) => {
   const productId = req.params.productId;
+  if (!/^\d+$/.test(productId)) {
+    return res.json({ success: false, error: "無效的商品 ID" });
+  }
   const memberId = req.my_jwt?.id; 
   const output = { success: false, data: null, relatedProducts: [] ,like_id : null, memberId : memberId};
+
+
 
   try {
     const sql = `
@@ -326,5 +496,30 @@ console.log("Product ID:", product_id);
   }
   res.json(output);
 });
+
+
+
+router.get("/api/review", async (req, res) => {
+  const memberId = req.my_jwt?.id;
+  if (!memberId) {
+      return res.json({ success: false, error: "需要登入會員" });
+  }
+
+  const sql = `
+      SELECT o.product_id, p.name, p.image_url
+      FROM shop_orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE o.member_id = ? AND o.status = '已歸還'
+      ORDER BY added_at DESC;
+  `;
+
+  try {
+    const [rows] = await db.query(sql, [memberId]);
+    if (rows.length === 0) {
+      return res.json({ success: true, products: [] });}
+    res.json({ success: true, products: rows });
+} catch (error) {
+    res.json({ success: false, error: error.message });
+}});
 
 export default router;
