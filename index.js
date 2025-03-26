@@ -20,7 +20,7 @@ import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
 import chatsRouter from "./routes/chats.js";
-
+import gymfriendsRouter from "./routes/gymfriends.js";
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -89,7 +89,8 @@ app.use("/classes", classesRouter);
 app.use("/articles", articlesRouter);
 app.use("/friends", friendsRouter);
 app.use("/locations", locationsRouter);
-
+app.use("/gymfriends", gymfriendsRouter);
+app.use("/chats", chatsRouter);
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
@@ -280,7 +281,7 @@ app.post("/login-jwt", async (req, res) => {
     data: {
       id: 0,
       account: "",
-      // avatar: "",
+      avatar: "",
       token: "",
     },
   };
@@ -293,7 +294,7 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const sql =
-    "SELECT member.*,member_profile.avatar FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id WHERE email = ?";
+    "SELECT member.*, member_profile.avatar FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id WHERE email = ?";
   const [rows] = await db.query(sql, [account]);
   if (!rows.length) {
     output.error = "帳號或密碼錯誤";
@@ -302,9 +303,9 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const row = rows[0];
-  // const avatarUrl = row.avatar
-  // ? `/img/${user.avatar}`
-  // : '/img/default_avatar.png';
+  const avatarUrl = row.avatar
+  ? `/img/${row.avatar}`
+  : '/img/default_avatar.png';
   const result = await bcrypt.compare(password, row.password_hash);
   if (!result) {
     output.error = "帳號或密碼錯誤";
@@ -322,7 +323,7 @@ app.post("/login-jwt", async (req, res) => {
   output.data = {
     id: row.member_id,
     account: row.email,
-    // avatar:row.avatar,
+    avatar:avatarUrl,
     token,
   };
   res.json(output);
