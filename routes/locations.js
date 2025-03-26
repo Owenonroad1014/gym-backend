@@ -13,10 +13,26 @@ const getLocationData = async (req) => {
 
   try {
     // 從 locations 資料表查詢
-    const [rows] = await db.query(`
+    const { location, branch } = req.query;
+    let sql = `
       SELECT *
       FROM locations
-    `);
+      WHERE 1
+    `;
+    const values = [];
+
+    // 動態加入查詢條件
+    if (location) {
+      sql += ' AND location = ?';
+      values.push(location);
+    }
+    // if (branch) {
+    //   sql += ' AND branch = ?';
+    //   values.push(branch);
+    // }
+
+    // 執行查詢
+    const [rows] = await db.query(sql, values);
 
     output.success = true;
     output.rows = rows;
@@ -25,10 +41,9 @@ const getLocationData = async (req) => {
 
   } catch (error) {
     console.error('獲取位置資料失敗:', error);
-    return {
-      ...output,
-      error: '獲取位置資料失敗'
-    };
+    output.success = false;
+    output.error = error.message; // 添加錯誤訊息
+    return output;
   }
 };
 
