@@ -7,7 +7,7 @@ const getGYMFriendList = async (req) => {
     const member_id = req.my_jwt?.id;
     const output = {
         success: false,
-        redirect: undefined, 
+        redirect: undefined,
         perPage: 12,
         totalRows: 0,
         totalPages: 0,
@@ -78,5 +78,6 @@ router.get("/api", async (req, res) => {
     const data = await getGYMFriendList(req);
     res.json(data);
 });
+
 
 export default router;
