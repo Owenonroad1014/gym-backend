@@ -9,9 +9,9 @@ export const rgSchema = z
     password: z
       .string()
       .min(1, { message: "密碼為必填" })
-      .min(8, { message: "密碼至少8個字元" })
+      .min(8, { message: "密碼至少8個字元且需包含大小寫英文字母、數字、及特殊字元 @$!%*?&#" })
       .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])/, {
-        message: "密碼需包含大小寫英文字母、數字、及特殊字元 @$!%*?&#",
+        message: "密碼至少8個字元且需包含大小寫英文字母、數字、及特殊字元 @$!%*?&##",
       }),
     confirmPassword: z.string(),
   })
