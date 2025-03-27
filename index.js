@@ -23,6 +23,7 @@ import registerRouter from "./routes/register.js";
 import chatsRouter from "./routes/chats.js";
 import gymfriendsRouter from "./routes/gymfriends.js";
 import memberCenterRouter from "./routes/member-center.js";
+import mailRouter from './routes/mail.js'
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -83,6 +84,7 @@ app.use((req, res, next) => {
 // 定義路由
 // app.use('/api/auth',googleLoginRouter)
 app.use("/register", registerRouter);
+app.use('/email', mailRouter)
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
