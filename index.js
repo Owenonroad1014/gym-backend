@@ -22,6 +22,7 @@ import registerRouter from "./routes/register.js";
 // import googleLoginRouter from './routes/google-login.js'
 import chatsRouter from "./routes/chats.js";
 import gymfriendsRouter from "./routes/gymfriends.js";
+import memberCenterRouter from "./routes/member-center.js";
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -93,6 +94,8 @@ app.use("/friends", friendsRouter);
 app.use("/locations", locationsRouter);
 app.use("/gymfriends", gymfriendsRouter);
 app.use("/chats", chatsRouter);
+app.use("/memberCenter", memberCenterRouter);
+
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
