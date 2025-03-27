@@ -84,7 +84,7 @@ app.use((req, res, next) => {
 // 定義路由
 // app.use('/api/auth',googleLoginRouter)
 app.use("/register", registerRouter);
-app.use('/email', mailRouter)
+app.use(mailRouter)
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
