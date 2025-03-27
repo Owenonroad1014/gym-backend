@@ -145,22 +145,25 @@ router.put("/api/profile", upload.single("avatar"), async (req, res) => {
   
   
 
-  let { pname: name, avatar, sex, mobile, intro, item, goal, status } = req.body;
+  let { pname: name, avatar,sex, mobile, intro, item, goal, status } = req.body;
+  const folder = req.body.folder || 'avatar';
   
-
 // Convert item to array if it's a string
-if (typeof item === 'string' && item.length > 0) {
-  req.body.item = item.split(/[\s、,]+/).filter(s => s.length > 0);
-} else if (!Array.isArray(req.body.item)) {
-  req.body.item = [];
-}
+req.body.item = typeof req.body.item === 'string'
+  ? req.body.item.split(/[\s、,]+/).filter(s => s.length > 0)
+  : Array.isArray(req.body.item) ? req.body.item : [];
 
-// Convert goal to array if it's a string
-if (typeof goal === 'string' && goal.length > 0) {
-  req.body.goal = goal.split(/[\s、,]+/).filter(s => s.length > 0);
-} else if (!Array.isArray(req.body.goal)) {
-  req.body.goal = [];
-}
+req.body.goal = typeof req.body.goal === 'string'
+  ? req.body.goal.split(/[\s、,]+/).filter(s => s.length > 0)
+  : Array.isArray(req.body.goal) ? req.body.goal : [];
+
+
+  if (typeof status === 'string') {
+    req.body.status = status.toLowerCase() === 'true';
+  } else {
+    req.body.status = Boolean(status);
+  }
+  
 
   // 表單驗證
   const zResult = pfSchema.safeParse(req.body);
@@ -172,11 +175,13 @@ if (typeof goal === 'string' && goal.length > 0) {
     return res.json(zResult);
   }
 
+
   // 轉換布林值
-  req.body.status = req.body.status ? 1 : 0;
+// req.body.status = req.body.status ? 0 : 1;  
 
-  const dataObj = { sex, mobile,status:req.body.status };
+  const dataObj = { sex, mobile,status:req.body.status ? 1: 0 };
 
+  
   // 判斷有沒有上傳頭貼
   if (req.file?.filename) {
     dataObj.avatar = req.file.filename;
@@ -187,17 +192,20 @@ if (typeof goal === 'string' && goal.length > 0) {
   dataObj.intro = intro;
   }
 // Check if item is a non-empty array or has a string value
-if (item && (Array.isArray(item) && item.length > 0)) {
-  dataObj.item = dataObj.item.join(',')
+if (item && Array.isArray(item) && item.length > 0) {
+  dataObj.item = item.join(','); // ✅ 確保 item 是陣列再做 join
+} else {
+  dataObj.item = ''; // 確保 dataObj.item 不是 undefined
 }
-
 
 // Check if goal is a non-empty array or has a string value
-if (goal && (!Array.isArray(goal) && goal.length > 0)) {
-  dataObj.item = dataObj.item.join(',')
+if (goal && Array.isArray(goal) && goal.length > 0) {
+  dataObj.goal = goal.join(',');
+} else {
+  dataObj.goal = '';
 }
  
-    
+  
   
   const sql1 = `
     UPDATE member_profile SET ? WHERE member_profile.member_id=?;

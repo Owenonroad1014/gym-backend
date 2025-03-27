@@ -19,6 +19,7 @@ import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
+// import googleLoginRouter from './routes/google-login.js'
 import chatsRouter from "./routes/chats.js";
 import gymfriendsRouter from "./routes/gymfriends.js";
 
@@ -79,7 +80,8 @@ app.use((req, res, next) => {
 });
 
 // 定義路由
-app.use("/register", registerRouter)
+// app.use('/api/auth',googleLoginRouter)
+app.use("/register", registerRouter);
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
@@ -135,6 +137,7 @@ app.post("/try-post-form", (req, res) => {
 app.post("/try-upload", upload.single("avatar"), (req, res) => {
   res.json(req.file);
 });
+
 app.post("/try-uploads", upload.array("photos"), (req, res) => {
   res.json(req.files);
 });
@@ -282,6 +285,7 @@ app.post("/login-jwt", async (req, res) => {
       id: 0,
       account: "",
       avatar: "",
+      name:"",
       token: "",
     },
   };
@@ -304,8 +308,8 @@ app.post("/login-jwt", async (req, res) => {
 
   const row = rows[0];
   const avatarUrl = row.avatar
-  ? `/img/${row.avatar}`
-  : '/img/default_avatar.png';
+    ? `/img/avatar/${row.avatar}`
+    : "";
   const result = await bcrypt.compare(password, row.password_hash);
   if (!result) {
     output.error = "帳號或密碼錯誤";
@@ -320,10 +324,12 @@ app.post("/login-jwt", async (req, res) => {
     },
     process.env.JWT_KEY
   );
+
   output.data = {
     id: row.member_id,
     account: row.email,
-    avatar:avatarUrl,
+    avatar: avatarUrl,
+    name:row.name,
     token,
   };
   res.json(output);
