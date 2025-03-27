@@ -146,7 +146,7 @@ router.put("/api/profile", upload.single("avatar"), async (req, res) => {
   
 
   let { pname: name, avatar,sex, mobile, intro, item, goal, status } = req.body;
-  const folder = req.body.folder || 'default';
+  const folder = req.body.folder || 'avatar';
   
 // Convert item to array if it's a string
 req.body.item = typeof req.body.item === 'string'
@@ -158,9 +158,12 @@ req.body.goal = typeof req.body.goal === 'string'
   : Array.isArray(req.body.goal) ? req.body.goal : [];
 
 
-if (typeof status === 'string') {
-  req.body.status = status === 'true'
-} 
+  if (typeof status === 'string') {
+    req.body.status = status.toLowerCase() === 'true';
+  } else {
+    req.body.status = Boolean(status);
+  }
+  
 
   // 表單驗證
   const zResult = pfSchema.safeParse(req.body);
@@ -172,10 +175,11 @@ if (typeof status === 'string') {
     return res.json(zResult);
   }
 
-  // 轉換布林值
-  req.body.status = req.body.status ? 1 : 0;
 
-  const dataObj = { sex, mobile,status:req.body.status? 1 : 0 };
+  // 轉換布林值
+// req.body.status = req.body.status ? 0 : 1;  
+
+  const dataObj = { sex, mobile,status:req.body.status ? 1: 0 };
 
   
   // 判斷有沒有上傳頭貼
@@ -201,7 +205,7 @@ if (goal && Array.isArray(goal) && goal.length > 0) {
   dataObj.goal = '';
 }
  
-    
+  
   
   const sql1 = `
     UPDATE member_profile SET ? WHERE member_profile.member_id=?;
