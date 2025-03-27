@@ -153,9 +153,7 @@ req.body.item = typeof req.body.item === 'string'
   ? req.body.item.split(/[\s、,]+/).filter(s => s.length > 0)
   : Array.isArray(req.body.item) ? req.body.item : [];
 
-req.body.goal = typeof req.body.goal === 'string'
-  ? req.body.goal.split(/[\s、,]+/).filter(s => s.length > 0)
-  : Array.isArray(req.body.goal) ? req.body.goal : [];
+
 
 
   if (typeof status === 'string') {
@@ -198,12 +196,9 @@ if (item && Array.isArray(item) && item.length > 0) {
   dataObj.item = ''; // 確保 dataObj.item 不是 undefined
 }
 
-// Check if goal is a non-empty array or has a string value
-if (goal && Array.isArray(goal) && goal.length > 0) {
-  dataObj.goal = goal.join(',');
-} else {
-  dataObj.goal = '';
-}
+// 確保 item 和 goal 被轉為陣列，即使它是字串
+dataObj.item = item ? [].concat(item).filter(Boolean).join(',').replace(/^[\s、,]+|[\s、,]+$/g, '')  : '';
+dataObj.goal = goal ? [].concat(goal).filter(Boolean).join(',') : '';
  
   
   
