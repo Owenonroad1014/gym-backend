@@ -25,6 +25,7 @@ import gymfriendsRouter from "./routes/gymfriends.js";
 import memberCenterRouter from "./routes/member-center.js";
 import mailRouter from './routes/mail.js'
 import changePassRouter from './routes/change-password.js'
+import profileRouter from './routes/profile.js'
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -84,10 +85,10 @@ app.use((req, res, next) => {
 
 // 定義路由
 // app.use('/api/auth',googleLoginRouter)
-app.use(mailRouter)
-app.use("/change-password", changePassRouter)
 app.use("/register", registerRouter);
-
+app.use('/forget-password',mailRouter)
+app.use("/change-password", changePassRouter)
+app.use('/api/member',profileRouter)
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
