@@ -24,6 +24,7 @@ import chatsRouter from "./routes/chats.js";
 import gymfriendsRouter from "./routes/gymfriends.js";
 import memberCenterRouter from "./routes/member-center.js";
 import mailRouter from './routes/mail.js'
+import changePassRouter from './routes/change-password.js'
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -83,8 +84,10 @@ app.use((req, res, next) => {
 
 // 定義路由
 // app.use('/api/auth',googleLoginRouter)
-app.use("/register", registerRouter);
 app.use(mailRouter)
+app.use("/change-password", changePassRouter)
+app.use("/register", registerRouter);
+
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
@@ -344,6 +347,7 @@ app.get("/jwt-data", (req, res) => {
   res.json(req.my_jwt);
 });
 
+// app.use("/change-password",changePassRouter)
 // ************** 404 要在所有的路由之後 ****************
 app.use((req, res) => {
   res.status(404).send(`<h1>您走錯路了</h1>
