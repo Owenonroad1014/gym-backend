@@ -24,6 +24,8 @@ import chatsRouter from "./routes/chats.js";
 import gymfriendsRouter from "./routes/gymfriends.js";
 import memberCenterRouter from "./routes/member-center.js";
 import mailRouter from './routes/mail.js'
+import changePassRouter from './routes/change-password.js'
+import profileRouter from './routes/profile.js'
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -84,7 +86,9 @@ app.use((req, res, next) => {
 // 定義路由
 // app.use('/api/auth',googleLoginRouter)
 app.use("/register", registerRouter);
-app.use(mailRouter)
+app.use('/forget-password',mailRouter)
+app.use("/change-password", changePassRouter)
+app.use('/api/member',profileRouter)
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
@@ -312,9 +316,9 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const row = rows[0];
-  const avatarUrl = row.avatar
-    ? `/img/avatar/${row.avatar}`
-    : "";
+  // const avatarUrl = row.avatar
+  //   ? `/img/avatar/${row.avatar}`
+  //   : "";
   const result = await bcrypt.compare(password, row.password_hash);
   if (!result) {
     output.error = "帳號或密碼錯誤";
@@ -333,7 +337,7 @@ app.post("/login-jwt", async (req, res) => {
   output.data = {
     id: row.member_id,
     account: row.email,
-    avatar: avatarUrl,
+    avatar: row.avatar,
     name:row.name,
     token,
   };
@@ -344,6 +348,7 @@ app.get("/jwt-data", (req, res) => {
   res.json(req.my_jwt);
 });
 
+// app.use("/change-password",changePassRouter)
 // ************** 404 要在所有的路由之後 ****************
 app.use((req, res) => {
   res.status(404).send(`<h1>您走錯路了</h1>

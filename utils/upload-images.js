@@ -17,7 +17,7 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let uploadPath = "public/img";
 
-    const folder = req.query.folder || "default"; 
+    const folder = req.query.folder || "avatar"; 
     uploadPath = path.join(uploadPath, folder);
     cb(null, uploadPath);
   },
