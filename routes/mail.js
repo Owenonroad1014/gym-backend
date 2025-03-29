@@ -102,7 +102,7 @@ router.get("/verify-token", async (req, res) => {
 });
 
 // 重置密碼
-router.post("/reset-password", async (req, res) => {
+router.put("/reset-password", async (req, res) => {
   const output = {
     success: false,
     result: null,
