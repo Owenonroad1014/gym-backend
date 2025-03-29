@@ -316,9 +316,9 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const row = rows[0];
-  const avatarUrl = row.avatar
-    ? `/img/avatar/${row.avatar}`
-    : "";
+  // const avatarUrl = row.avatar
+  //   ? `/img/avatar/${row.avatar}`
+  //   : "";
   const result = await bcrypt.compare(password, row.password_hash);
   if (!result) {
     output.error = "帳號或密碼錯誤";
@@ -337,7 +337,7 @@ app.post("/login-jwt", async (req, res) => {
   output.data = {
     id: row.member_id,
     account: row.email,
-    avatar: avatarUrl,
+    avatar: row.avatar,
     name:row.name,
     token,
   };
