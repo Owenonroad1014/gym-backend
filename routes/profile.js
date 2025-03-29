@@ -58,7 +58,7 @@ const editSchema = z
       return true; // 若 status 為 false，不進行檢查
     },
     {
-      message: "檔案狀態為公開時，自我簡介需為必填，且至少需要30個字元",
+      message: "檔案狀態為公開時，自我簡介為必填，且至少需要30個字元",
       path: ["intro"],
     }
   );
