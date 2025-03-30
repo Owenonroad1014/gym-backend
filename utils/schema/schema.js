@@ -4,8 +4,8 @@ export const rgSchema = z
   .object({
     email: z
       .string()
-      .min(1, { message: "電子郵箱為必填" })
-      .email({ message: "請填寫正確的電子郵箱" }),
+      .min(1, { message: "電子信箱為必填" })
+      .email({ message: "請填寫正確的電子信箱格式" }),
     password: z
       .string()
       .min(1, { message: "密碼為必填" })
