@@ -1,17 +1,12 @@
 import express from "express";
 import db from "../utils/connect-mysql.js";
-import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { z } from "zod";
 import "dotenv/config.js";
 import transporter from "../utils/mail.js";
 
 const router = express.Router();
-
-// 重置密碼token
-function generateResetToken() {
-  return crypto.randomBytes(32).toString("hex");
-}
 
 // 發送密碼重置郵件
 router.post("/", async (req, res) => {
@@ -20,18 +15,16 @@ router.post("/", async (req, res) => {
     bodyData: req.body,
     result: null,
     error: "",
+    token: { token: "", expiresAt: "" },
   };
 
   const { email } = req.body;
+
   if (!email) {
     output.error = "請提供電子信箱";
     return res.json(output);
   }
   try {
-    const token = generateResetToken();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    // Token 有效 15 分鐘
-
     const sql = `SELECT * FROM member WHERE email=?`;
     const [user] = await db.query(sql, [email]);
 
@@ -39,14 +32,12 @@ router.post("/", async (req, res) => {
       output.error = "此電子信箱尚未註冊";
       return res.json(output);
     }
-
-    const o_sql = `DELETE FROM password_reset WHERE email=?`;
-    await db.query(o_sql, [email]);
-
-    const n_sql = `INSERT INTO password_reset (email, token, expires_at) VALUES (?, ?, ?)`;
-    await db.query(n_sql, [email, token, expiresAt]);
-
-    const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
+    const nToken = jwt.sign({ email }, process.env.JWT_KEY, {
+      expiresIn: "15m",
+    });
+    const nExpiresAt = Date.now() + 15 * 60 * 1000;
+    output.token = { token: nToken, expiresAt: nExpiresAt };
+    const resetLink = `${process.env.CLIENT_URL}/member/reset-password?token=${nToken}`;
     const mailOptions = {
       from: `"GYMBOO"<${process.env.SMTP_TO_EMAIL}>`,
       to: email,
@@ -60,43 +51,12 @@ router.post("/", async (req, res) => {
       output.success = true;
       return res.json(output);
     } catch (err) {
-      output.error = err;
+      output.error = "郵件發送失敗" + err.message;
       return res.json(output);
     }
   } catch (err) {
     console.log(err);
-    output.error = err;
-    return res.json(output);
-  }
-});
-
-// 驗證 Token（前端頁面應該先調用這個 API 確保 Token 有效）
-router.get("/verify-token", async (req, res) => {
-  const output = {
-    success: false,
-    result: null,
-    error: "",
-  };
-
-  const { token } = req.query;
-  if (!token) {
-    output.error = "缺少Token";
-    return res.json(output);
-  }
-
-  try {
-    const tk_sql = `SELECT * FROM password_reset WHERE token = ? AND expires_at > NOW()`;
-    const [rows] = await db.query(tk_sql, [token]);
-
-    if (rows.length === 0) {
-      output.error = "Token 無效或已過期";
-      return res.json(output);
-    }
-    output.success = true;
-    res.json(output);
-  } catch (error) {
-    console.log(err);
-    output.error = err;
+    output.error = "伺服器錯誤" + err.message;
     return res.json(output);
   }
 });
@@ -110,33 +70,43 @@ router.put("/reset-password", async (req, res) => {
   };
 
   const { token, newPassword } = req.body;
-  if (!token || !newPassword) {
-    output.error = "缺少必要參數";
+  if (!token) {
+    output.error = "Token不存在";
+    return res.json(output);
+  }
+  if (!newPassword) {
+    output.error = "請設定新密碼";
     return res.json(output);
   }
 
   try {
-    const tk_sql = `SELECT * FROM password_reset WHERE token = ? AND expires_at > NOW()`;
-    const [rows] = await db.query(tk_sql, [token]);
+    const decoded = jwt.verify(token, process.env.JWT_KEY);
+    const email = decoded.email;
 
-    if (rows.length === 0) {
-      output.error = "Token 無效或已過期";
+    // Additional check for token expiration
+    if (decoded.exp < Math.floor(Date.now() / 1000)) {
+      output.error = "重設密碼連結已過期";
       return res.json(output);
     }
 
-    const email = rows[0].email;
     const resetSchema = z.object({
       newPassword: z
         .string()
         .min(1, { message: "密碼為必填" })
-        .min(8, { message: "密碼至少8個字元且需包含大小寫英文字母、數字、及特殊字元 @$!%*?&#" })
+        .min(8, {
+          message:
+            "密碼至少8個字元且需包含大小寫英文字母、數字、及特殊字元 @$!%*?&#",
+        })
         .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])/, {
-          message: "密碼至少8個字元且需包含大小寫英文字母、數字、及特殊字元 @$!%*?&#",
+          message:
+            "密碼至少8個字元且需包含大小寫英文字母、數字、及特殊字元 @$!%*?&#",
         }),
     });
-    const zResult = resetSchema.safeParse(req.body);
+    const zResult = resetSchema.safeParse({ newPassword });
     if (!zResult.success) {
-      output.error = zResult.error.issues.map(issue => issue.message).join(', ');
+      output.error = zResult.error.issues
+        .map((issue) => issue.message)
+        .join(", ");
       return res.json(output);
     }
 
@@ -145,16 +115,19 @@ router.put("/reset-password", async (req, res) => {
 
     // 更新用戶密碼
     const r_sql = `UPDATE member SET password_hash = ? WHERE email = ?`;
-    await db.query(r_sql, [hashedPassword, email]);
+    const [result] = await db.query(r_sql, [hashedPassword, email]);
 
-    // 刪除已使用的 Token
-    const dl_sql = `DELETE FROM password_reset WHERE email = ?`;
-    await db.query(dl_sql, [email]);
-    output.success = true;
-    res.json(output);
+    if (result.affectedRows > 0) {
+      output.success = true;
+      output.result = "密碼重設成功";
+    } else {
+      output.error = "找不到該用戶";
+    }
+
+    return res.json(output);
   } catch (err) {
     console.error(err);
-    output.error = err;
+    output.error = err.message;
     return res.json(output);
   }
 });
