@@ -151,6 +151,40 @@ router.get("/", async (req, res) => {
   
 });
 
+router.get("/api/favorites", async (req, res) => {
+  const member_id = req.my_jwt?.id;
+  
+  if (!member_id) {
+    return res.status(401).json({ success: false, error: "未登入" });
+  }
+
+  try {
+    const sql = `
+      SELECT 
+        p.id AS product_id, 
+        p.name, 
+        p.price, 
+        p.image_url, 
+        p.description, 
+        p.average_rating, 
+        c.category_name, 
+        p.created_at
+      FROM Favorites f
+      JOIN Products p ON f.product_id = p.id
+      JOIN Categories c ON p.category_id = c.id
+      WHERE f.member_id = ? 
+      ORDER BY f.created_at DESC
+    `;
+
+    const [favorites] = await db.query(sql, [member_id]);
+
+    res.json({ success: true, favorites });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 
 
 
@@ -378,7 +412,7 @@ router.get("/api/:productId", async (req, res) => {
 
       // 取得相關產品
       const relatedSql = `
-        SELECT p.id, p.name AS product_name, p.price, p.image_url, p.description
+        SELECT p.id, p.name AS product_name, p.price, p.image_url, p.description, p.average_rating
         FROM Products p
         JOIN Categories c ON p.category_id = c.id
         WHERE c.category_name = ? AND p.id != ?
@@ -400,6 +434,37 @@ router.get("/api/:productId", async (req, res) => {
   }
   
   res.json(output);
+});
+
+router.get("/api/:productId/reviews", async (req, res) => {
+  const productId = req.params.productId;
+  const page = parseInt(req.query.page) || 1; // 預設為第 1 頁
+  const limit = parseInt(req.query.limit) || 10; // 預設每次取 10 筆
+  const offset = (page - 1) * limit; // 計算偏移量
+  
+  console.log(`Fetching reviews for product ${productId}, page ${page}, limit ${limit}`);
+
+  if (!/^\d+$/.test(productId)) {
+    return res.json({ success: false, error: "無效的商品 ID" });
+  }
+
+  try {
+    const sql = `
+      SELECT pr.id AS review_id, pr.rating, pr.review_text, pr.created_at, 
+             m.member_id, m.name AS member_name
+      FROM product_reviews pr
+      JOIN member m ON pr.member_id = m.member_id
+      WHERE pr.product_id = ?
+      ORDER BY pr.created_at DESC
+      LIMIT ? OFFSET ?;
+    `;
+
+    const [reviews] = await db.query(sql, [productId, limit, offset]);
+
+    res.json({ success: true, reviews });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 router.post("/api", upload.single('avatar'), async (req, res) => {
@@ -496,6 +561,44 @@ console.log("Product ID:", product_id);
   }
   res.json(output);
 });
+
+
+router.delete("/api/favorites/:productId", async (req, res) => {
+  const member_id = req.my_jwt?.id;
+  const { productId } = req.params;
+
+  if (!member_id) {
+    return res.status(401).json({ success: false, error: "未登入" });
+  }
+
+  try {
+    // 檢查該商品是否在用戶的收藏列表中
+    const [existingFavorite] = await db.query(
+      "SELECT * FROM Favorites WHERE member_id = ? AND product_id = ?",
+      [member_id, productId]
+    );
+
+    if (existingFavorite.length === 0) {
+      return res.status(404).json({ success: false, error: "該商品不在收藏列表中" });
+    }
+
+    // 刪除收藏記錄
+    const [result] = await db.query(
+      "DELETE FROM Favorites WHERE member_id = ? AND product_id = ?",
+      [member_id, productId]
+    );
+
+    if (result.affectedRows > 0) {
+      return res.json({ success: true, message: "商品已取消收藏" });
+    } else {
+      return res.status(400).json({ success: false, error: "刪除失敗，請稍後再試" });
+    }
+  } catch (error) {
+    console.error("取消收藏錯誤:", error);
+    return res.status(500).json({ success: false, error: "伺服器錯誤" });
+  }
+});
+
 
 
 
