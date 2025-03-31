@@ -6,7 +6,6 @@ const classesRouter = express.Router();
 const dateFormat = "YYYY-MM-DD";
 
 const getCalendarData = async (req) => {
-
   const output = {
     success: false,
     perPage: 30,
@@ -46,6 +45,7 @@ const getCalendarData = async (req) => {
           c.*,
           co.name as coach_name,
           ct.type_name as title,
+          cc.category_name,
           l.location,
           l.branch,
           DATE_FORMAT(c.class_date, '%Y-%m-%d') as class_date,
@@ -55,6 +55,7 @@ const getCalendarData = async (req) => {
         JOIN locations l ON c.location_id = l.id
         LEFT JOIN coaches co ON c.coach_id = co.id
         LEFT JOIN class_types ct ON c.type_id = ct.id
+        LEFT JOIN class_categories cc ON c.category_id = cc.id
         WHERE 1=1
         ${location ? " AND l.location = ?" : ""}
         ${branch ? " AND l.branch = ?" : ""}
@@ -84,6 +85,56 @@ const getCalendarData = async (req) => {
     return output;
   }
 };
+
+// 取得預約列表 GET /api/reservations
+
+classesRouter.get("/api/reservations", async (req, res) => {
+  try {
+    const member_id = req.my_jwt?.id;
+
+    if (!member_id) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    const output = {
+      success: false,
+      code: 0,
+      rows: [],
+      error: "",
+    };
+
+    // 根據會員ID取得資料
+    const [rows] = await db.query(
+      `SELECT r.*, c.*, co.name as coach_name, l.location, l.branch, ct.type_name
+FROM reservations r
+LEFT JOIN classes c ON r.class_id = c.id
+LEFT JOIN coaches co ON c.coach_id = co.id
+LEFT JOIN locations l ON c.location_id = l.id
+LEFT JOIN class_types ct ON c.type_id = ct.id
+WHERE r.member_id = ?
+ORDER BY r.reservation_date ASC, r.reservation_time ASC
+
+`,
+      [member_id]
+    );
+
+    if (rows.length > 0) {
+      output.success = true;
+      output.rows = rows;
+      return res.json(output); // 加入return
+    } else {
+      output.error = "沒有預約紀錄";
+      output.code = 400;
+      return res.json(output); // 加入return
+    }
+  } catch (error) {
+    console.error("API錯誤:", error); // 加入錯誤記錄
+    return res.status(500).json({
+      success: false,
+      error: "伺服器錯誤",
+    });
+  }
+});
 
 // GET / classes / api / : class_id
 classesRouter.get("/api/:id", async (req, res) => {
@@ -189,6 +240,69 @@ classesRouter.post("/api/reservations", async (req, res) => {
       "UPDATE classes SET current_capacity = current_capacity + 1 WHERE id =?",
       [class_id]
     );
+  } catch (err) {
+    console.error("API 發生錯誤:", err);
+    res
+      .status(500)
+      .json({ success: false, error: "伺服器錯誤", details: err.message });
+  }
+});
+
+
+// 取消預約
+classesRouter.put("/api/reservations", async (req, res) => {
+  try {
+    const member_id = req.my_jwt?.id;
+    if (!member_id) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    
+    let { class_id , status } = req.body
+    
+    const output = {
+      success: false,
+      code: 0,
+      data: "",
+      error: "",
+    };
+    
+
+    // 先檢查課程是否存在
+    const [classData] = await db.query(
+      "SELECT current_capacity, max_capacity FROM classes WHERE id = ?",
+      [class_id]
+    );
+    
+
+    if (!classData || classData.length === 0) {
+      output.error = "課程不存在";
+      output.code = 401;
+      return res.json(output);
+    }
+    
+
+
+    // 新增預約
+    const [result] = await db.query(
+      `UPDATE reservations 
+       SET status = ? 
+       WHERE class_id = ? AND member_id = ?`,
+      [status, class_id, member_id]
+    );
+    
+
+    output.success = !!result.affectedRows;
+    output.data = { class_id, status };
+    res.json(output);
+
+    // 更新課程人數
+    if (status === 'cancelled') {
+      await db.query(
+        `UPDATE classes SET current_capacity = current_capacity - 1 WHERE id = ?`,
+        [class_id]
+      );
+    }
+
   } catch (err) {
     console.error("API 發生錯誤:", err);
     res
