@@ -18,24 +18,6 @@ const removeUploadedImg = async (file) => {
   return false;
 };
 
-// 格式化手機號碼的函式
-function formatPhoneNumber(phoneNumber) {
-  // 移除所有非數字字符
-  phoneNumber = phoneNumber.replace(/\D/g, "");
-
-  // 確保手機號碼長度為 10
-  if (phoneNumber.length === 10) {
-    // 提取前3個和後3個數字
-    const prefix = phoneNumber.slice(0, 4); // 取 '09'
-    const suffix = phoneNumber.slice(-3); // 取 '678'
-
-    // 隨機生成3個大寫字母
-    const middle = "XXX"; // 可以用隨機字母來替換這裡的 "XXXXX"
-
-    // 返回格式化後的號碼
-    return (phoneNumber = `${prefix}${middle}${suffix}`);
-  }
-}
 const editSchema = z
   .object({
     item: z
@@ -91,29 +73,6 @@ const getItemById = async (id) => {
 router.get("/get-profile", async (req, res) => {
   const member_id = req.my_jwt?.id;
   const output = await getItemById(member_id);
-
-  const row = output.data;
-  // const avatarUrl = row.avatar ? `/img/avatar/${row.avatar}` : "";
-  const status = Boolean(row.status);
-  const goal =
-    typeof row.goal === "string"
-      ? row.goal.split(/[\s、,]+/).filter((s) => s.length > 0)
-      : Array.isArray(row.goal)
-      ? row.goal
-      : [];
-  const mobile = formatPhoneNumber(row.mobile);
-
-  output.data = {
-    id: row.member_id,
-    name: row.name,
-    avatar: row.avatar,
-    sex: row.sex,
-    mobile: mobile,
-    intro: row.intro || "",
-    item: row.item || "",
-    goal: goal || "暫無目標",
-    status: status,
-  };
   output.success = true;
   return res.json(output);
 });
@@ -130,6 +89,8 @@ router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
 
   // 先取到原本的項目資料
   const { success, error, data: originalData } = await getItemById(member_id);
+  
+  
   if (!success) {
     output.error = error;
     return res.json(output);
@@ -139,16 +100,17 @@ router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
   let { intro, item, goal, status } = req.body;
 
   // Convert item to array if it's a string
-  req.body.item =
-    typeof req.body.item === "string"
-      ? req.body.item.split(/[\s、,]+/).filter((s) => s.length > 0)
-      : Array.isArray(req.body.item)
-      ? req.body.item
-      : [];
+  // req.body.item =
+  //   typeof req.body.item === "string"
+  //     ? req.body.item.split(/[\s、,]+/).filter((s) => s.length > 0)
+  //     : Array.isArray(req.body.item)
+  //     ? req.body.item
+  //     : [];
 
-  if (typeof status === "string") {
-    req.body.status = status.toLowerCase() === "true";
-  }
+  // if (typeof status === "string") {
+  //   req.body.status = status.toLowerCase() === "true";
+  // }
+  
   // 表單驗證
   const zResult = editSchema.safeParse(req.body);
   // 如果資料驗證沒過
@@ -156,8 +118,14 @@ router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
     if (req.file?.filename) {
       removeUploadedImg(req.file.filename);
     }
-    return res.json(zResult);
+    output.error = {
+      code: 'VALIDATION_ERROR',
+      details: zResult.error.issues
+    };
+    return res.status(400).json(output);
   }
+  
+  
 
   // 轉換布林值
   const r_status = req.body.status ? 1 : 0;
@@ -189,21 +157,27 @@ router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
       ([_, val]) => val !== undefined && val !== ""
     )
   );
+  
+  
 
   if (Object.keys(filteredDataObj).length === 0) {
     output.error = "沒有要更新的資料";
     return res.json(output);
   }
+  
+  
 
   const sql = `
     UPDATE member_profile SET ?  WHERE member_profile.member_id=?;
   `;
 
   try {
-    const [result] = await db.query(sql, [filteredDataObj, originalData.member_id]);
 
+    const [result] = await db.query(sql, [filteredDataObj, originalData.member_id]);
+   
+    
     output.result = result;
-    output.success = !!result.changedRows;
+    output.success = true;
 
     // 判斷有沒有上傳頭貼, 有的話刪掉之前的頭貼
     if (req.file?.filename) {
@@ -214,9 +188,11 @@ router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
     if (req.file?.filename) {
       removeUploadedImg(req.file.filename);
     }
-    output.error = ex;
+    output.error = `資料庫操作錯誤: ${ex.message}`;
+    console.error(ex);
     return res.json(output);
   }
+
   return res.json(output);
 });
 
