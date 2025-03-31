@@ -329,33 +329,36 @@ app.post("/api/auth/google-login", async (req, res) => {
           "INSERT INTO member_profile (member_id,avatar) VALUES (?,?)",
           [output.data.id, avatar]
         );
-        output.result = [sql1, sql2];
-        output.success = !!(sql1.changedRows || sql2.changedRows);
+        output.success = !!(sql1.affectedRows && sql2.affectedRows);
       }
     } else {
-      await db.query(`UPDATE member SET google_uid=? WHERE email=?`, [
-        google_uid,
-        email,
-      ]);
+      if (!user[0].google_uid) {
+        const [sql3] = await db.query(
+          `UPDATE member SET google_uid=? WHERE email=?`,
+          [google_uid, email]
+        );
+        output.success = !!sql3.affectedRows;
+      }
     }
 
     const [result] = await db.query(
       `SELECT member.*,member_profile.avatar FROM member LEFT JOIN member_Profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
       [google_uid]
     );
+
     if (!result || result.length === 0) {
       output.error = "沒有該用戶";
       return res.status(404).json({ output });
     }
 
     output.success = true; // 登入成功
-    output.result =result[0]
     const token = jwt.sign(
       {
         id: result[0].member_id,
         account: result[0].google_uid,
       },
-      process.env.JWT_KEY
+      process.env.JWT_KEY,
+      { expiresIn: "7d" }
     );
 
     output.data = {
@@ -367,7 +370,7 @@ app.post("/api/auth/google-login", async (req, res) => {
     };
     res.json({ output, token });
   } catch (error) {
-    console.error(error);
+    console.error(error.message);
     res.status(500).json({ message: "伺服器錯誤" });
   }
 });
