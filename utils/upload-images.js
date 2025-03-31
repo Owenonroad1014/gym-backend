@@ -1,5 +1,6 @@
 import multer from "multer";
 import { v4 } from "uuid";
+import path from "path";
 
 // 篩選檔案和決定副檔名
 const extMap = {
@@ -15,10 +16,9 @@ const fileFilter = (req, file, callback) => {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let uploadPath = "public/img";
-    if (req.body.folder==="avatar") {
-      uploadPath += `/${req.body.folder}`;
-    }
 
+    const folder = req.query.folder || "avatar"; 
+    uploadPath = path.join(uploadPath, folder);
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {

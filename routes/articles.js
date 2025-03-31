@@ -1,4 +1,4 @@
-import express from "express";
+import express, { json } from "express";
 import db from "../utils/connect-mysql.js";
 
 const router = express.Router();
@@ -90,6 +90,37 @@ router.get("/api", async function (req, res) {
     res.json(data);
 });
 
+/* 獲取會員所有最愛文章. */
+router.get("/api/allFav", async function (req, res) {
+    const member_id = req.my_jwt?.id;
+    const output = {
+        success: false,
+        data: [],
+        total: 0,
+        error: "",
+    };
+    if (!member_id || isNaN(member_id)) {
+        output.error = "請登入會員";
+        return res.json(output);
+    }
+    try {
+        const t_sql = `SELECT count(*) AS total FROM article_favorites LEFT JOIN articles on article_favorites.article_id = articles.id WHERE article_favorites.member_id = ?  ;`;
+        const [total] = await db.query(t_sql, [member_id]);
+        const sql = `SELECT * FROM article_favorites LEFT JOIN articles on article_favorites.article_id = articles.id WHERE article_favorites.member_id = ?  ;`;
+        const [result] = await db.query(sql, [member_id]);
+        if (result.length <= 0) {
+            output.error = "沒有收藏";
+        }
+        output.total = total[0].total;
+        output.data = result;
+        output.success = true;
+        return res.json(output);
+    } catch (err) {
+        console.error("Error occurred:", err);
+        return res.json(output);
+    }
+});
+
 /* 獲取文章top5. */
 router.get("/api/top-five", async (req, res) => {
     const output = {
@@ -109,6 +140,30 @@ router.get("/api/top-five", async (req, res) => {
         output.success = false;
         output.error = "沒有文章";
     }
+    res.json(output);
+});
+/* 獲取單一文章我的最愛. */
+router.get("/api/fav", async function (req, res) {
+    const member_id = req.my_jwt?.id;
+    const output = {
+        success: false,
+        data: [],
+        error: "",
+    };
+
+    if (!member_id) {
+        output.error = "需要登入會員";
+        return res.json(output);
+    }
+
+    // 查詢該會員是否已收藏該文章
+    const sql = `SELECT * FROM article_favorites WHERE member_id = ? `;
+    const [data] = await db.query(sql, [member_id]);
+
+    output.data = data;
+    output.success = true;
+
+    // 返回結果
     res.json(output);
 });
 /* 獲取文章我的最愛. */
@@ -160,6 +215,78 @@ router.get("/api/toggle-likes/:articleid", async (req, res) => {
     }
     res.json(output);
 });
+
+/* 獲取單一文章我的最愛. */
+router.get("/api/fav/:articleid", async function (req, res) {
+    const articleid = Number(req.params.articleid);
+    const member_id = req.my_jwt?.id;
+    const output = {
+        success: false,
+        data: [],
+        error: "",
+    };
+
+    if (!member_id) {
+        output.error = "需要登入會員";
+        return res.json(output);
+    }
+
+    // 查詢該會員是否已收藏該文章
+    const sql = `SELECT * FROM article_favorites WHERE member_id = ? AND article_id = ?`;
+    const [data] = await db.query(sql, [member_id, articleid]);
+    // if(data.data){
+    //     output.error("沒有資料")
+    // }
+    output.data = data;
+    output.success = true;
+
+    // 返回結果
+    res.json(output);
+});
+
+/* TOGGLE單一文章我的最愛. */
+router.get("/api/favToggle/:articleid", async function (req, res) {
+    const articleid = Number(req.params.articleid); // 文章 ID
+    const member_id = req.my_jwt?.id; // 會員 ID
+    const output = {
+        success: false,
+        data: [],
+        article_id: articleid,
+        error: "",
+    };
+
+    if (!member_id) {
+        output.error = "需要登入會員";
+        return res.json(output);
+    }
+
+    // 查詢該會員是否已收藏該文章
+    const sql = `SELECT * FROM article_favorites WHERE member_id = ? AND article_id = ?`;
+    const [fav] = await db.query(sql, [member_id, articleid]);
+
+    if (fav.length > 0) {
+        // 文章已經被收藏，執行移除操作
+        const like_id = fav[0].like_id;
+        output.action = "remove";
+        const deleteSql = `DELETE FROM article_favorites WHERE like_id = ?`;
+        const [result] = await db.query(deleteSql, [like_id]);
+
+        output.data = result;
+        output.success = result.affectedRows > 0; // 根據 affectedRows 判斷是否成功移除
+    } else {
+        // 文章尚未被收藏，執行新增操作
+        output.action = "add";
+        const insertSql = `INSERT INTO article_favorites (member_id, article_id) VALUES (?, ?)`;
+        const [result] = await db.query(insertSql, [member_id, articleid]);
+
+        output.data = result;
+        output.success = result.affectedRows > 0; // 根據 affectedRows 判斷是否成功插入
+    }
+
+    // 返回結果
+    res.json(output);
+});
+
 /* 獲取單一文章. */
 router.get("/api/:articleid", async function (req, res) {
     // const output = await getItemById(req.params.articleid);
