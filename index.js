@@ -18,6 +18,8 @@ import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
+import cartsRouter from "./routes/carts.js";
+import ecpayRouter from "./routes/ecpay-test-only.js"
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
 
@@ -80,10 +82,12 @@ app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
 app.use("/products", productsRouter);
+app.use("/carts", cartsRouter);
 app.use("/classes", classesRouter);
 app.use("/articles", articlesRouter);
 app.use("/friends", friendsRouter);
 app.use("/locations", locationsRouter);
+app.use("/ecpay", ecpayRouter);
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
