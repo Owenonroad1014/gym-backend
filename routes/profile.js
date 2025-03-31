@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import upload from "../utils/upload-images.js";
 import { z } from "zod";
 
-const router = express.Router();
+const profileRouter = express.Router();
 
 // *** 刪除沒用到的已上傳的圖檔
 const removeUploadedImg = async (file) => {
@@ -70,7 +70,7 @@ const getItemById = async (id) => {
 };
 
 // 取得個人檔案
-router.get("/get-profile", async (req, res) => {
+profileRouter.get("/get-profile", async (req, res) => {
   const member_id = req.my_jwt?.id;
   const output = await getItemById(member_id);
   output.success = true;
@@ -78,7 +78,7 @@ router.get("/get-profile", async (req, res) => {
 });
 
 // 修改個人檔案
-router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
+profileRouter.put("/edit-profile", upload.single("avatar"), async (req, res) => {
   const member_id = req.my_jwt?.id;
   const output = {
     success: false,
@@ -89,8 +89,9 @@ router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
 
   // 先取到原本的項目資料
   const { success, error, data: originalData } = await getItemById(member_id);
+  console.log(originalData);
   
-  
+
   if (!success) {
     output.error = error;
     return res.json(output);
@@ -100,17 +101,20 @@ router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
   let { intro, item, goal, status } = req.body;
 
   // Convert item to array if it's a string
-  // req.body.item =
-  //   typeof req.body.item === "string"
-  //     ? req.body.item.split(/[\s、,]+/).filter((s) => s.length > 0)
-  //     : Array.isArray(req.body.item)
-  //     ? req.body.item
-  //     : [];
+  req.body.item =
+    typeof req.body.item === "string"
+      ? req.body.item.split(/[\s、,]+/).filter((s) => s.length > 0)
+      : Array.isArray(req.body.item)
+      ? req.body.item
+      : [];
 
-  // if (typeof status === "string") {
-  //   req.body.status = status.toLowerCase() === "true";
-  // }
-  
+  if (typeof status === "string") {
+    req.body.status = status.toLowerCase() === "true";
+  }
+  console.log('req.body 內容:', req.body);
+console.log('轉換後的 item:', req.body.item);
+console.log('轉換後的 status:', req.body.status);
+
   // 表單驗證
   const zResult = editSchema.safeParse(req.body);
   // 如果資料驗證沒過
@@ -119,13 +123,14 @@ router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
       removeUploadedImg(req.file.filename);
     }
     output.error = {
-      code: 'VALIDATION_ERROR',
-      details: zResult.error.issues
+      code: "VALIDATION_ERROR",
+      details: zResult.error.issues,
     };
     return res.status(400).json(output);
   }
-  
-  
+  console.log("zResult:", zResult);
+
+  console.log('準備轉換資料:', { intro, item, goal, status });
 
   // 轉換布林值
   const r_status = req.body.status ? 1 : 0;
@@ -157,33 +162,39 @@ router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
       ([_, val]) => val !== undefined && val !== ""
     )
   );
-  
-  
 
   if (Object.keys(filteredDataObj).length === 0) {
     output.error = "沒有要更新的資料";
     return res.json(output);
   }
-  
-  
+
+  console.log("filteredDataObj:", filteredDataObj);
 
   const sql = `
     UPDATE member_profile SET ?  WHERE member_profile.member_id=?;
   `;
 
   try {
+    const [result] = await db.query(sql, [
+      filteredDataObj,
+      originalData.member_id,
+    ]);
+    console.log('資料庫操作結果:', result);
+  console.log('影響的資料行數:', result.affectedRows);
 
-    const [result] = await db.query(sql, [filteredDataObj, originalData.member_id]);
-   
-    
-    output.result = result;
-    output.success = true;
+    // 確認是否有更新到資料
+    if (result.affectedRows > 0) {
+      output.success = true;
+      output.result = result;
+    } else {
+      output.success = false;
+      output.error = "資料更新失敗";
+    }
 
     // 判斷有沒有上傳頭貼, 有的話刪掉之前的頭貼
     if (req.file?.filename) {
       removeUploadedImg(originalData.avatar);
     }
-   
   } catch (ex) {
     if (req.file?.filename) {
       removeUploadedImg(req.file.filename);
@@ -196,4 +207,4 @@ router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
   return res.json(output);
 });
 
-export default router;
+export default profileRouter;

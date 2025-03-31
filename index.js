@@ -89,7 +89,6 @@ app.use((req, res, next) => {
 app.use("/register", registerRouter);
 app.use("/forget-password", mailRouter);
 app.use("/change-password", changePassRouter);
-app.use("/api/member", profileRouter);
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
@@ -102,6 +101,7 @@ app.use("/locations", locationsRouter);
 app.use("/gymfriends", gymfriendsRouter);
 app.use("/chats", chatsRouter);
 app.use("/memberCenter", memberCenterRouter);
+app.use("/profile", profileRouter);
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
