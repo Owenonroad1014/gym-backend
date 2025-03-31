@@ -97,7 +97,7 @@ router.get("/api/allFav", async function (req, res) {
         success: false,
         data: [],
         perPage: 12,
-        total: 0,
+        totalRows: 0,
         totalPages: 0,
         page: 0,
         error: "",
@@ -119,10 +119,10 @@ router.get("/api/allFav", async function (req, res) {
     try {
         const t_sql = `SELECT count(*) AS total FROM article_favorites LEFT JOIN articles on article_favorites.article_id = articles.id  ${where} ;`;
         const [total] = await db.query(t_sql, [member_id]);
-        output.total = total[0].total;
+        output.totalRows = total[0].total;
         // 計算總頁數
         const totalPages = Math.ceil(total[0].total / perPage);
-
+        output.totalPages = totalPages
         if (page > totalPages) {
             output.redirect = `?page=${totalPages}`;
             return output;
