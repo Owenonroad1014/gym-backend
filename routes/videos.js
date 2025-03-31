@@ -150,6 +150,37 @@ router.get("/", async (req, res) => {
   
 });
 
+router.get("/api/favorites", async (req, res) => {
+  const member_id = req.my_jwt?.id;
+  
+  if (!member_id) {
+    return res.status(401).json({ success: false, error: "未登入" });
+  }
+
+  try {
+    const sql = `
+      SELECT 
+        v.id AS video_id, 
+        v.title, 
+        v.url, 
+        v.description, 
+        c.category_name, 
+        v.created_at
+      FROM video_favorites f
+      JOIN Videos p ON f.video_id = v.id
+      JOIN video_categories c ON p.category_id = c.id
+      WHERE f.member_id = ? 
+      ORDER BY f.created_at DESC
+    `;
+
+    const [favorites] = await db.query(sql, [member_id]);
+
+    res.json({ success: true, favorites });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // router.get("/add", async(req, res) => {
 //   res.locals.title = "新增通訊錄 - " + res.locals.title;
 //   res.locals.pageName = "products-add";
