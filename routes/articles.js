@@ -116,6 +116,7 @@ router.get("/api/allFav", async function (req, res) {
     }
     const perPage = output.perPage;
     let page = +req.query.page || 1;
+    output.page = page
     try {
         const t_sql = `SELECT count(*) AS total FROM article_favorites LEFT JOIN articles on article_favorites.article_id = articles.id  ${where} ;`;
         const [total] = await db.query(t_sql, [member_id]);
