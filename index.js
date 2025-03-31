@@ -321,28 +321,26 @@ app.post("/api/auth/google-login", async (req, res) => {
         "INSERT INTO member (google_uid, name, email,password_hash) VALUES (?, ?, ?, ?)",
         [google_uid, name, email, password_hash]
       );
-      output.result = sql1;
-      output.success = !!sql1.affectedRows;
-      output.data.id = sql1.insertId;
-      if (output.data.id > 0) {
+;
+      if (sql1.affectedRows) {
         const [sql2] = await db.query(
           "INSERT INTO member_profile (member_id,avatar) VALUES (?,?)",
-          [output.data.id, avatar]
+          [sql1.insertId, avatar]
         );
-        output.success = !!(sql1.affectedRows && sql2.affectedRows);
+       ;
       }
+      output.success = !!(sql1.affectedRows && sql2.affectedRows)
     } else {
       if (!user[0].google_uid) {
         const [sql3] = await db.query(
-          `UPDATE member SET google_uid=? WHERE email=?`,
+          `UPDATE member SET google_uid=? WHERE email=?  AND google_uid IS NULL`,
           [google_uid, email]
         );
-        output.success = !!sql3.affectedRows;
       }
     }
 
     const [result] = await db.query(
-      `SELECT member.*,member_profile.avatar FROM member LEFT JOIN member_Profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
+      `SELECT member.*,member_profile.avatar FROM member LEFT JOIN member_profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
       [google_uid]
     );
 
@@ -351,27 +349,30 @@ app.post("/api/auth/google-login", async (req, res) => {
       return res.status(404).json({ output });
     }
 
-    output.success = true; // 登入成功
     const token = jwt.sign(
       {
         id: result[0].member_id,
-        account: result[0].google_uid,
+        account: result[0].email,
+        google_uid:result[0].google_uid
       },
       process.env.JWT_KEY,
       { expiresIn: "7d" }
     );
-
+    
+    output.success = true; // 登入成功
     output.data = {
       id: result[0].member_id,
-      uid: result[0].google_uid,
+      account:result[0].email,
+      google_uid: result[0].google_uid,
       avatar: result[0].avatar,
       name: result[0].name,
       token,
     };
-    res.json({ output, token });
+    res.json(output);
+    console.log({output,token});
   } catch (error) {
-    console.error(error.message);
-    res.status(500).json({ message: "伺服器錯誤" });
+    output.error =error.message
+    res.status(500).json(output);
   }
 });
 
