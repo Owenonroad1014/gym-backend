@@ -42,9 +42,24 @@ const getChatsList = async (req) => {
                 return output;
             }
             // 獲取聊天室
-            const sql = `SELECT chats.*,m1.name user1_name ,m2.name user2_name FROM chats  left join member m1 on user1_id =  m1.member_id left join member m2 on user2_id =  m2.member_id WHERE user1_id=? OR user2_id=? ;`;
-            [rows] = await db.query(sql, [member_id, member_id]);
+            const sql = ` SELECT 
+                    chats.*, 
+                    m1.name AS user1_name, 
+                    m2.name AS user2_name,
+                    (SELECT COUNT(*) FROM messages WHERE chat_id = chats.id AND sender_id != ? AND is_read = FALSE) AS unread_count
+                FROM 
+                    chats
+                LEFT JOIN 
+                    member m1 ON user1_id = m1.member_id
+                LEFT JOIN 
+                    member m2 ON user2_id = m2.member_id
+                WHERE 
+                    user1_id = ? OR user2_id = ?
+                ;`;
+            [rows] = await db.query(sql, [member_id, member_id,member_id]);
+            
         }
+        
 
         return { ...output, totalRows, totalPages, page, rows, success: true };
     } catch (err) {
@@ -123,7 +138,6 @@ router.post("/api/deleteChatroom", async (req, res) => {
         output.error = "資料加載失敗，請稍後再試。";
         return res.json(output);
     }
-    
 });
 
 // 獲取聊天內容
@@ -192,4 +206,46 @@ router.post("/api/sendMsg", async (req, res) => {
     }
 });
 
+// 已讀訊息
+router.post("/api/readMsg", async (req, res) => {
+    const output = {
+        success: false,
+        data: [],
+        error: "",
+    };
+    const { chat_id } = req.body;
+    const member_id = req.my_jwt?.id;
+
+    if (!member_id) {
+        output.error = "用戶未登入";
+        return res.json(output);
+    }
+
+    try {
+        // 確認聊天訊息和聊天室
+        const sqlchat = `SELECT  messages.id FROM messages left join chats on messages.chat_id  = chats.id where chat_id =? AND sender_id != ? AND messages.is_read = FALSE ;`;
+        const [messages] = await db.query(sqlchat, [chat_id,member_id]);
+        if (messages.length <= 0) {
+            output.error = "訊息不存在";
+            return res.json(output);
+        }
+        const messageIds = messages.map(msg => msg.id);
+        // 將更新已讀訊息
+        const sql = `UPDATE messages SET is_read = TRUE WHERE id IN (?);`;
+        const [result] = await db.query(sql,[messageIds]);
+
+        if (result.affectedRows > 0) {
+            output.success = true;
+            output.data = result;
+            output.message = "已讀訊息成功";
+            return res.json(output);
+        } else {
+            output.error = "已讀訊息失敗";
+            return res.json(output);
+        }
+    } catch (err) {
+        output.error = "內部伺服器錯誤";
+        return res.json(output);
+    }
+});
 export default router;

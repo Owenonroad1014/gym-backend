@@ -19,8 +19,13 @@ import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
+// import googleLoginRouter from './routes/google-login.js'
 import chatsRouter from "./routes/chats.js";
 import gymfriendsRouter from "./routes/gymfriends.js";
+import memberCenterRouter from "./routes/member-center.js";
+import mailRouter from './routes/mail.js'
+import changePassRouter from './routes/change-password.js'
+import profileRouter from './routes/profile.js'
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -79,7 +84,11 @@ app.use((req, res, next) => {
 });
 
 // 定義路由
-app.use("/register", registerRouter)
+// app.use('/api/auth',googleLoginRouter)
+app.use("/register", registerRouter);
+app.use('/forget-password',mailRouter)
+app.use("/change-password", changePassRouter)
+app.use('/api/member',profileRouter)
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
@@ -91,6 +100,8 @@ app.use("/friends", friendsRouter);
 app.use("/locations", locationsRouter);
 app.use("/gymfriends", gymfriendsRouter);
 app.use("/chats", chatsRouter);
+app.use("/memberCenter", memberCenterRouter);
+
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
@@ -135,6 +146,7 @@ app.post("/try-post-form", (req, res) => {
 app.post("/try-upload", upload.single("avatar"), (req, res) => {
   res.json(req.file);
 });
+
 app.post("/try-uploads", upload.array("photos"), (req, res) => {
   res.json(req.files);
 });
@@ -282,6 +294,7 @@ app.post("/login-jwt", async (req, res) => {
       id: 0,
       account: "",
       avatar: "",
+      name:"",
       token: "",
     },
   };
@@ -303,9 +316,9 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const row = rows[0];
-  const avatarUrl = row.avatar
-  ? `/img/${row.avatar}`
-  : '/img/default_avatar.png';
+  // const avatarUrl = row.avatar
+  //   ? `/img/avatar/${row.avatar}`
+  //   : "";
   const result = await bcrypt.compare(password, row.password_hash);
   if (!result) {
     output.error = "帳號或密碼錯誤";
@@ -320,10 +333,12 @@ app.post("/login-jwt", async (req, res) => {
     },
     process.env.JWT_KEY
   );
+
   output.data = {
     id: row.member_id,
     account: row.email,
-    avatar:avatarUrl,
+    avatar: row.avatar,
+    name:row.name,
     token,
   };
   res.json(output);
@@ -333,6 +348,7 @@ app.get("/jwt-data", (req, res) => {
   res.json(req.my_jwt);
 });
 
+// app.use("/change-password",changePassRouter)
 // ************** 404 要在所有的路由之後 ****************
 app.use((req, res) => {
   res.status(404).send(`<h1>您走錯路了</h1>
