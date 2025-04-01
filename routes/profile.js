@@ -92,7 +92,7 @@ profileRouter.put(
 
     // 先取到原本的項目資料
     const { success, error, data: originalData } = await getItemById(member_id);
-    console.log(originalData);
+   
 
     if (originalData) {
       // 改用這個條件判斷
@@ -117,9 +117,7 @@ profileRouter.put(
     if (typeof status === "string") {
       req.body.status = status.toLowerCase() === "true";
     }
-    console.log("req.body 內容:", req.body);
-    console.log("轉換後的 item:", req.body.item);
-    console.log("轉換後的 status:", req.body.status);
+    
 
     // 表單驗證
     const zResult = editSchema.safeParse(req.body);
@@ -135,7 +133,6 @@ profileRouter.put(
       return res.status(400).json(output);
     }
     console.log("zResult:", zResult);
-
     console.log("準備轉換資料:", { intro, item, goal, status });
 
     // 轉換布林值
@@ -185,8 +182,7 @@ profileRouter.put(
         filteredDataObj,
         originalData.member_id,
       ]);
-      console.log("資料庫操作結果:", result);
-      console.log("影響的資料行數:", result.affectedRows);
+    
 
       // 確認是否有更新到資料
       if (result.affectedRows > 0) {

@@ -28,6 +28,7 @@ import memberCenterRouter from "./routes/member-center.js";
 import mailRouter from "./routes/mail.js";
 import changePassRouter from "./routes/change-password.js";
 import profileRouter from "./routes/profile.js";
+import emailRouter from "./routes/email.js";
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -104,6 +105,7 @@ app.use("/gymfriends", gymfriendsRouter);
 app.use("/chats", chatsRouter);
 app.use("/memberCenter", memberCenterRouter);
 app.use("/profile", profileRouter);
+app.use("/email", emailRouter);
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
@@ -439,6 +441,10 @@ app.post("/login-jwt", async (req, res) => {
 app.get("/jwt-data", (req, res) => {
   res.json(req.my_jwt);
 });
+
+
+
+
 
 // app.use("/change-password",changePassRouter)
 // ************** 404 要在所有的路由之後 ****************
