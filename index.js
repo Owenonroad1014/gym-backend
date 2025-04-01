@@ -20,6 +20,8 @@ import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
+import cartsRouter from "./routes/carts.js";
+import ecpayRouter from "./routes/ecpay-test-only.js"
 // import googleLoginRouter from './routes/google-login.js'
 import chatsRouter from "./routes/chats.js";
 import gymfriendsRouter from "./routes/gymfriends.js";
@@ -94,16 +96,18 @@ app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
 app.use("/products", productsRouter);
-app.use("/videos", videosRouter);
+app.use("/carts", cartsRouter);
 app.use("/classes", classesRouter);
 app.use("/articles", articlesRouter);
 app.use("/friends", friendsRouter);
 app.use("/locations", locationsRouter);
+app.use("/ecpay", ecpayRouter);
 app.use("/gymfriends", gymfriendsRouter);
 app.use("/chats", chatsRouter);
 app.use("/memberCenter", memberCenterRouter);
 app.use("/profile", profileRouter);
 app.use("/email", emailRouter);
+
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
@@ -323,54 +327,58 @@ app.post("/api/auth/google-login", async (req, res) => {
         "INSERT INTO member (google_uid, name, email,password_hash) VALUES (?, ?, ?, ?)",
         [google_uid, name, email, password_hash]
       );
-      output.result = sql1;
-      output.success = !!sql1.affectedRows;
-      output.data.id = sql1.insertId;
-      if (output.data.id > 0) {
+;
+      if (sql1.affectedRows) {
         const [sql2] = await db.query(
           "INSERT INTO member_profile (member_id,avatar) VALUES (?,?)",
-          [output.data.id, avatar]
+          [sql1.insertId, avatar]
         );
-        output.result = [sql1, sql2];
-        output.success = !!(sql1.changedRows || sql2.changedRows);
+       ;
       }
+      output.success = !!(sql1.affectedRows && sql2.affectedRows)
     } else {
-      await db.query(`UPDATE member SET google_uid=? WHERE email=?`, [
-        google_uid,
-        email,
-      ]);
+      if (!user[0].google_uid) {
+        const [sql3] = await db.query(
+          `UPDATE member SET google_uid=? WHERE email=?  AND google_uid IS NULL`,
+          [google_uid, email]
+        );
+      }
     }
 
     const [result] = await db.query(
-      `SELECT member.*,member_profile.avatar FROM member LEFT JOIN member_Profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
+      `SELECT member.*,member_profile.avatar FROM member LEFT JOIN member_profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
       [google_uid]
     );
+
     if (!result || result.length === 0) {
       output.error = "沒有該用戶";
       return res.status(404).json({ output });
     }
 
-    output.success = true; // 登入成功
-    output.result =result[0]
     const token = jwt.sign(
       {
         id: result[0].member_id,
-        account: result[0].google_uid,
+        account: result[0].email,
+        google_uid:result[0].google_uid
       },
-      process.env.JWT_KEY
+      process.env.JWT_KEY,
+      { expiresIn: "7d" }
     );
-
+    
+    output.success = true; // 登入成功
     output.data = {
       id: result[0].member_id,
-      uid: result[0].google_uid,
+      account:result[0].email,
+      google_uid: result[0].google_uid,
       avatar: result[0].avatar,
       name: result[0].name,
       token,
     };
-    res.json({ output, token });
+    res.json(output);
+    console.log({output,token});
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "伺服器錯誤" });
+    output.error =error.message
+    res.status(500).json(output);
   }
 });
 
