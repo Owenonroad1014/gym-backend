@@ -20,6 +20,8 @@ import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
+import cartsRouter from "./routes/carts.js";
+import ecpayRouter from "./routes/ecpay-test-only.js"
 // import googleLoginRouter from './routes/google-login.js'
 import chatsRouter from "./routes/chats.js";
 import gymfriendsRouter from "./routes/gymfriends.js";
@@ -93,15 +95,17 @@ app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
 app.use("/products", productsRouter);
-app.use("/videos", videosRouter);
+app.use("/carts", cartsRouter);
 app.use("/classes", classesRouter);
 app.use("/articles", articlesRouter);
 app.use("/friends", friendsRouter);
 app.use("/locations", locationsRouter);
+app.use("/ecpay", ecpayRouter);
 app.use("/gymfriends", gymfriendsRouter);
 app.use("/chats", chatsRouter);
 app.use("/memberCenter", memberCenterRouter);
 app.use("/profile", profileRouter);
+
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
