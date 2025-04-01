@@ -9,7 +9,7 @@ package-lock.json
 dev.env
 
 tmp_uploads
-public/imgs
+
 
 
 # Node artifact files
