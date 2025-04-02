@@ -41,7 +41,7 @@ AND r.status = 'confirmed'
 
     for (const reservation of rows) {
       const mailOptions = {
-        from: `"GYM步空間"<${process.env.EMAIL_USER}>`,
+        from: `"GYM步空間-課程預約通知"<${process.env.EMAIL_USER}>`,
         to: reservation.email,
         subject: "課程提醒通知",
         html: `
@@ -67,7 +67,7 @@ AND r.status = 'confirmed'
 }
 
 // 設定每天晚上 8 點執行通知
-// schedule.scheduleJob("0 8 * * *", checkUpcomingClasses);
+schedule.scheduleJob("/5 * * * *", checkUpcomingClasses);
 
 // 測試用 API 端點
 emailRouter.post("/test-email", async (req, res) => {

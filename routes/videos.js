@@ -79,6 +79,10 @@ const getListData = async (req) => {
   const totalPages = Math.ceil(totalRows / perPage);
 
   let rows = [];
+
+  if (totalRows === 0) {
+    return { ...output, success: true, rows: [] };
+  }
   // 確保頁碼不超過總頁數
   if (totalRows) {
     if (page > totalPages) {
