@@ -21,8 +21,7 @@ import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
 import cartsRouter from "./routes/carts.js";
-import ecpayRouter from "./routes/ecpay-test-only.js"
-// import googleLoginRouter from './routes/google-login.js'
+import ecpayRouter from "./routes/ecpay-test-only.js";
 import chatsRouter from "./routes/chats.js";
 import gymfriendsRouter from "./routes/gymfriends.js";
 import memberCenterRouter from "./routes/member-center.js";
@@ -107,7 +106,6 @@ app.use("/chats", chatsRouter);
 app.use("/memberCenter", memberCenterRouter);
 app.use("/profile", profileRouter);
 app.use("/email", emailRouter);
-
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
@@ -303,6 +301,7 @@ app.post("/api/auth/google-login", async (req, res) => {
       name: "",
       token: "",
     },
+    insertUid: null,
     profileResult: null,
   };
 
@@ -327,23 +326,20 @@ app.post("/api/auth/google-login", async (req, res) => {
         "INSERT INTO member (google_uid, name, email,password_hash) VALUES (?, ?, ?, ?)",
         [google_uid, name, email, password_hash]
       );
-;
       if (sql1.affectedRows) {
         const [sql2] = await db.query(
           "INSERT INTO member_profile (member_id,avatar) VALUES (?,?)",
           [sql1.insertId, avatar]
         );
-       ;
+        output.profileResult = !!sql2.affectedRows
       }
-      output.success = !!(sql1.affectedRows && sql2.affectedRows)
-    } else {
-      if (!user[0].google_uid) {
+    } else if (!user[0].google_uid) {
         const [sql3] = await db.query(
           `UPDATE member SET google_uid=? WHERE email=?  AND google_uid IS NULL`,
           [google_uid, email]
         );
+        output.insertUid=!!(sql3.affectedRows)
       }
-    }
 
     const [result] = await db.query(
       `SELECT member.*,member_profile.avatar FROM member LEFT JOIN member_profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
@@ -359,25 +355,25 @@ app.post("/api/auth/google-login", async (req, res) => {
       {
         id: result[0].member_id,
         account: result[0].email,
-        google_uid:result[0].google_uid
+        google_uid: result[0].google_uid,
       },
       process.env.JWT_KEY,
       { expiresIn: "7d" }
     );
-    
+
     output.success = true; // 登入成功
     output.data = {
       id: result[0].member_id,
-      account:result[0].email,
+      account: result[0].email,
       google_uid: result[0].google_uid,
       avatar: result[0].avatar,
       name: result[0].name,
       token,
     };
     res.json(output);
-    console.log({output,token});
+    console.log({ output, token });
   } catch (error) {
-    output.error =error.message
+    output.error = error.message;
     res.status(500).json(output);
   }
 });
