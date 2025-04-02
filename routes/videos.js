@@ -79,6 +79,10 @@ const getListData = async (req) => {
   const totalPages = Math.ceil(totalRows / perPage);
 
   let rows = [];
+
+  if (totalRows === 0) {
+    return { ...output, success: true, rows: [] };
+  }
   // 確保頁碼不超過總頁數
   if (totalRows) {
     if (page > totalPages) {
@@ -151,9 +155,10 @@ router.get("/", async (req, res) => {
 });
 
 router.get("/api/favorites", async (req, res) => {
-  const member_id = req.my_jwt?.id;
+  const memberId = req.my_jwt?.id;
+  console.log(memberId)
   
-  if (!member_id) {
+  if (!memberId) {
     return res.status(401).json({ success: false, error: "未登入" });
   }
 
@@ -167,13 +172,13 @@ router.get("/api/favorites", async (req, res) => {
         c.category_name, 
         v.created_at
       FROM video_favorites f
-      JOIN Videos p ON f.video_id = v.id
-      JOIN video_categories c ON p.category_id = c.id
+      JOIN Videos v ON f.video_id = v.id
+      JOIN videos_categories c ON v.category_id = c.id
       WHERE f.member_id = ? 
       ORDER BY f.created_at DESC
     `;
 
-    const [favorites] = await db.query(sql, [member_id]);
+    const [favorites] = await db.query(sql, [memberId]);
 
     res.json({ success: true, favorites });
   } catch (error) {
@@ -355,6 +360,43 @@ console.log("video ID:", video_id);
     output.success = !!result.affectedRows;
   }
   res.json(output);
+});
+
+
+router.delete("/api/favorites/:videoId", async (req, res) => {
+  const member_id = req.my_jwt?.id;
+  const { videoId } = req.params;
+
+  if (!member_id) {
+    return res.status(401).json({ success: false, error: "未登入" });
+  }
+
+  try {
+    // 檢查該商品是否在用戶的收藏列表中
+    const [existingFavorite] = await db.query(
+      "SELECT * FROM Favorites WHERE member_id = ? AND video_id = ?",
+      [member_id, videoId]
+    );
+
+    if (existingFavorite.length === 0) {
+      return res.status(404).json({ success: false, error: "該商品不在收藏列表中" });
+    }
+
+    // 刪除收藏記錄
+    const [result] = await db.query(
+      "DELETE FROM Favorites WHERE member_id = ? AND video_id = ?",
+      [member_id, videoId]
+    );
+
+    if (result.affectedRows > 0) {
+      return res.json({ success: true, message: "商品已取消收藏" });
+    } else {
+      return res.status(400).json({ success: false, error: "刪除失敗，請稍後再試" });
+    }
+  } catch (error) {
+    console.error("取消收藏錯誤:", error);
+    return res.status(500).json({ success: false, error: "伺服器錯誤" });
+  }
 });
 
 export default router;

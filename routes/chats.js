@@ -36,26 +36,41 @@ const getChatsList = async (req) => {
 
         let rows = [];
         if (totalRows > 0) {
-            // 確保頁碼不超過總頁數
-            if (page > totalPages) {
-                output.redirect = `?page=${totalPages}`;
-                return output;
-            }
+            
             // 獲取聊天室
-            const sql = ` SELECT 
-                    chats.*, 
-                    m1.name AS user1_name, 
-                    m2.name AS user2_name,
-                    (SELECT COUNT(*) FROM messages WHERE chat_id = chats.id AND sender_id != ? AND is_read = FALSE) AS unread_count
+            const sql = `SELECT 
+                chats.*,
+                newmsg.*,
+                m1.name AS user1_name, 
+                m1.avatar AS user1_avatar,
+                m2.name AS user2_name,
+                m2.avatar AS user2_avatar
+                from chats left join (
+                SELECT 
+                    m.chat_id, 
+                    m.sender_id, 
+                    m.message, 
+                    m.created_at newMsgTime,
+                    (SELECT COUNT(*) FROM messages WHERE messages.chat_id = m.chat_id  AND sender_id !=? AND is_read = FALSE) AS unread_count
                 FROM 
-                    chats
-                LEFT JOIN 
-                    member m1 ON user1_id = m1.member_id
-                LEFT JOIN 
-                    member m2 ON user2_id = m2.member_id
+                    messages m
+                JOIN 
+                    (SELECT chat_id, MAX(created_at) AS new_created_at FROM messages GROUP BY chat_id) AS newest_message
+                    ON m.chat_id = newest_message.chat_id
+                    AND m.created_at = newest_message.new_created_at
+                )newmsg on chats.id = newmsg.chat_id
+                left join 
+                (SELECT member.member_id,name,avatar FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id) m1 
+                ON user1_id = m1.member_id
+                left join 
+                (SELECT member.member_id,name,avatar FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id) m2 
+                ON user2_id = m2.member_id
                 WHERE 
-                    user1_id = ? OR user2_id = ?
-                ;`;
+                user1_id = ? OR user2_id = ? ORDER BY newmsg.newMsgTime desc
+            ;`;
+           
+            
+            
             [rows] = await db.query(sql, [member_id, member_id,member_id]);
             
         }
@@ -74,6 +89,7 @@ router.get("/api", async (req, res) => {
     const data = await getChatsList(req);
     res.json(data);
 });
+
 // 獲取聊天室單一數據
 router.get("/api/:chatroomid", async (req, res) => {
     const chatroomid = parseInt(req.params.chatroomid);
@@ -83,7 +99,11 @@ router.get("/api/:chatroomid", async (req, res) => {
         error: "",
     };
     try {
-        const sql = `SELECT chats.*, m1.name user1_name ,m2.name user2_name  FROM chats LEFT JOIN member m1 ON user1_id =m1.member_id LEFT JOIN member m2 ON user2_id =m2.member_id WHERE chats.id = ?;`;
+        const sql = `SELECT chats.*, m1.name user1_name ,m1.avatar AS user1_avatar,m2.name user2_name,m2.avatar AS user2_avatar  FROM chats 
+        LEFT JOIN (SELECT member.member_id,name,avatar FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id) m1 
+        ON user1_id =m1.member_id 
+        LEFT JOIN (SELECT member.member_id,name,avatar FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id) m2
+        ON user2_id =m2.member_id WHERE chats.id = ?;`;
         const [result] = await db.query(sql, [chatroomid]);
         output.data = result;
         output.success = true;

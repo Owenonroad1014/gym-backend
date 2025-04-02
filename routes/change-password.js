@@ -6,7 +6,7 @@ import { z } from "zod";
 const router = express.Router();
 
 // 比對舊密碼
-router.post("/confirm-password", async (req, res) => {
+router.post("/confirm", async (req, res) => {
   const output = {
     success: false,
     bodyData: req.body,
