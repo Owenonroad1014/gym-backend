@@ -39,7 +39,7 @@ router.post("/", async (req, res) => {
     output.token = { token: nToken, expiresAt: nExpiresAt };
     const resetLink = `${process.env.CLIENT_URL}/member/reset-password?token=${nToken}`;
     const mailOptions = {
-      from: `"GYMBOO"<${process.env.SMTP_TO_EMAIL}>`,
+      from: `"GYM步空間-忘記密碼通知"<${process.env.SMTP_TO_EMAIL}>`,
       to: email,
       subject: "重設密碼請求",
       html: `<p>請點擊以下連結來重設您的密碼：</p>
