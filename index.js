@@ -314,6 +314,7 @@ app.post("/api/auth/google-login", async (req, res) => {
     .slice(0, length);
   const password_hash = await bcrypt.hash(password, 12);
 
+  const add_status = 0;
   try {
     // 檢查資料庫是否已有此用戶
     const [user] = await db.query("SELECT * FROM member WHERE email = ?", [
@@ -328,21 +329,21 @@ app.post("/api/auth/google-login", async (req, res) => {
       );
       if (sql1.affectedRows) {
         const [sql2] = await db.query(
-          "INSERT INTO member_profile (member_id,avatar) VALUES (?,?)",
-          [sql1.insertId, avatar]
+          "INSERT INTO member_profile (member_id,avatar,add_status) VALUES (?,?,?)",
+          [sql1.insertId, avatar, add_status]
         );
-        output.profileResult = !!sql2.affectedRows
+        output.profileResult = !!sql2.affectedRows;
       }
     } else if (!user[0].google_uid) {
-        const [sql3] = await db.query(
-          `UPDATE member SET google_uid=? WHERE email=?  AND google_uid IS NULL`,
-          [google_uid, email]
-        );
-        output.insertUid=!!(sql3.affectedRows)
-      }
+      const [sql3] = await db.query(
+        `UPDATE member SET google_uid=? WHERE email=?  AND google_uid IS NULL`,
+        [google_uid, email]
+      );
+      output.insertUid = !!sql3.affectedRows;
+    }
 
     const [result] = await db.query(
-      `SELECT member.*,member_profile.avatar FROM member LEFT JOIN member_profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
+      `SELECT member.*, member_profile.avatar, member_profile.add_status FROM member LEFT JOIN member_profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
       [google_uid]
     );
 
@@ -368,10 +369,10 @@ app.post("/api/auth/google-login", async (req, res) => {
       google_uid: result[0].google_uid,
       avatar: result[0].avatar,
       name: result[0].name,
+      add_status: result[0].add_status,
       token,
     };
-    res.json(output);
-    console.log({ output, token });
+    return res.json(output);
   } catch (error) {
     output.error = error.message;
     res.status(500).json(output);
@@ -401,7 +402,7 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const sql =
-    "SELECT member.*, member_profile.avatar FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id WHERE email = ?";
+    "SELECT member.*, member_profile.avatar,member_profile.add_status FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id WHERE email = ?";
   const [rows] = await db.query(sql, [account]);
   if (!rows.length) {
     output.error = "帳號或密碼錯誤";
@@ -433,6 +434,7 @@ app.post("/login-jwt", async (req, res) => {
     account: row.email,
     avatar: row.avatar,
     name: row.name,
+    add_status:row.add_status,
     token,
   };
   res.json(output);
@@ -441,10 +443,6 @@ app.post("/login-jwt", async (req, res) => {
 app.get("/jwt-data", (req, res) => {
   res.json(req.my_jwt);
 });
-
-
-
-
 
 // app.use("/change-password",changePassRouter)
 // ************** 404 要在所有的路由之後 ****************
