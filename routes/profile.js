@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import upload from "../utils/upload-images.js";
 import { z } from "zod";
 
-const router = express.Router();
+const profileRouter = express.Router();
 
 // *** 刪除沒用到的已上傳的圖檔
 const removeUploadedImg = async (file) => {
@@ -18,24 +18,6 @@ const removeUploadedImg = async (file) => {
   return false;
 };
 
-// 格式化手機號碼的函式
-function formatPhoneNumber(phoneNumber) {
-  // 移除所有非數字字符
-  phoneNumber = phoneNumber.replace(/\D/g, "");
-
-  // 確保手機號碼長度為 10
-  if (phoneNumber.length === 10) {
-    // 提取前3個和後3個數字
-    const prefix = phoneNumber.slice(0, 4); // 取 '09'
-    const suffix = phoneNumber.slice(-3); // 取 '678'
-
-    // 隨機生成3個大寫字母
-    const middle = "XXX"; // 可以用隨機字母來替換這裡的 "XXXXX"
-
-    // 返回格式化後的號碼
-    return (phoneNumber = `${prefix}${middle}${suffix}`);
-  }
-}
 const editSchema = z
   .object({
     item: z
@@ -88,136 +70,144 @@ const getItemById = async (id) => {
 };
 
 // 取得個人檔案
-router.get("/get-profile", async (req, res) => {
+profileRouter.get("/get-profile", async (req, res) => {
   const member_id = req.my_jwt?.id;
   const output = await getItemById(member_id);
-
-  const row = output.data;
-  // const avatarUrl = row.avatar ? `/img/avatar/${row.avatar}` : "";
-  const status = Boolean(row.status);
-  const goal =
-    typeof row.goal === "string"
-      ? row.goal.split(/[\s、,]+/).filter((s) => s.length > 0)
-      : Array.isArray(row.goal)
-      ? row.goal
-      : [];
-  const mobile = formatPhoneNumber(row.mobile);
-
-  output.data = {
-    id: row.member_id,
-    name: row.name,
-    avatar: row.avatar,
-    sex: row.sex,
-    mobile: mobile,
-    intro: row.intro || "",
-    item: row.item || "",
-    goal: goal || "暫無目標",
-    status: status,
-  };
   output.success = true;
   return res.json(output);
 });
 
 // 修改個人檔案
-router.put("/edit-profile", upload.single("avatar"), async (req, res) => {
-  const member_id = req.my_jwt?.id;
-  const output = {
-    success: false,
-    bodyData: req.body,
-    result: null,
-    error: "",
-  };
+profileRouter.put(
+  "/edit-profile",
+  upload.single("avatar"),
+  async (req, res) => {
+    const member_id = req.my_jwt?.id;
+    const output = {
+      success: false,
+      bodyData: req.body,
+      result: null,
+      error: "",
+    };
 
-  // 先取到原本的項目資料
-  const { success, error, data: originalData } = await getItemById(member_id);
-  if (!success) {
-    output.error = error;
-    return res.json(output);
-  }
-  // 處理表單資料
+    // 先取到原本的項目資料
+    const { success, error, data: originalData } = await getItemById(member_id);
+   
 
-  let { intro, item, goal, status } = req.body;
-
-  // Convert item to array if it's a string
-  req.body.item =
-    typeof req.body.item === "string"
-      ? req.body.item.split(/[\s、,]+/).filter((s) => s.length > 0)
-      : Array.isArray(req.body.item)
-      ? req.body.item
-      : [];
-
-  if (typeof status === "string") {
-    req.body.status = status.toLowerCase() === "true";
-  }
-  // 表單驗證
-  const zResult = editSchema.safeParse(req.body);
-  // 如果資料驗證沒過
-  if (!zResult.success) {
-    if (req.file?.filename) {
-      removeUploadedImg(req.file.filename);
+    if (originalData) {
+      // 改用這個條件判斷
+      output.success = true; // 加入這行
+    } else {
+      output.error = error;
+      return res.json(output);
     }
-    return res.json(zResult);
-  }
 
-  // 轉換布林值
-  const r_status = req.body.status ? 1 : 0;
+    // 處理表單資料
 
-  const dataObj = { status: r_status };
+    let { intro, item, goal, status } = req.body;
 
-  // 判斷有沒有上傳頭貼
-  if (req.file?.filename) {
-    dataObj.avatar = req.file.filename;
-  }
+    // Convert item to array if it's a string
+    req.body.item =
+      typeof req.body.item === "string"
+        ? req.body.item.split(/[\s、,]+/).filter((s) => s.length > 0)
+        : Array.isArray(req.body.item)
+        ? req.body.item
+        : [];
 
-  if (intro) {
-    dataObj.intro = intro;
-  }
+    if (typeof status === "string") {
+      req.body.status = status.toLowerCase() === "true";
+    }
+    
 
-  // 確保 item 和 goal 被轉為陣列，即使它是字串，，再做 join
-  dataObj.item = item
-    ? []
-        .concat(item)
-        .filter(Boolean)
-        .join(",")
-        .replace(/^[\s、,]+|[\s、,]+$/g, "")
-    : "";
-  dataObj.goal = goal ? [].concat(goal).filter(Boolean).join(",") : "";
+    // 表單驗證
+    const zResult = editSchema.safeParse(req.body);
+    // 如果資料驗證沒過
+    if (!zResult.success) {
+      if (req.file?.filename) {
+        removeUploadedImg(req.file.filename);
+      }
+      output.error = {
+        code: "VALIDATION_ERROR",
+        details: zResult.error.issues,
+      };
+      return res.status(400).json(output);
+    }
+    console.log("zResult:", zResult);
+    console.log("準備轉換資料:", { intro, item, goal, status });
 
-  // 篩選掉 undefined 和空字串的屬性，避免覆蓋原本的資料
-  const filteredDataObj = Object.fromEntries(
-    Object.entries(dataObj).filter(
-      ([_, val]) => val !== undefined && val !== ""
-    )
-  );
+    // 轉換布林值
+    const r_status = req.body.status ? 1 : 0;
 
-  if (Object.keys(filteredDataObj).length === 0) {
-    output.error = "沒有要更新的資料";
-    return res.json(output);
-  }
+    const dataObj = { status: r_status };
 
-  const sql = `
-    UPDATE member_profile SET ?  WHERE member_profile.member_id=?;
+    // 判斷有沒有上傳頭貼
+    if (req.file?.filename) {
+      dataObj.avatar = req.file.filename;
+    }
+
+    if (intro) {
+      dataObj.intro = intro;
+    }
+
+    // 確保 item 和 goal 被轉為陣列，即使它是字串，，再做 join
+    dataObj.item = item
+      ? []
+          .concat(item)
+          .filter(Boolean)
+          .join(",")
+          .replace(/^[\s、,]+|[\s、,]+$/g, "")
+      : "";
+    dataObj.goal = goal ? [].concat(goal).filter(Boolean).join(",") : "";
+
+    // 篩選掉 undefined 和空字串的屬性，避免覆蓋原本的資料
+    const filteredDataObj = Object.fromEntries(
+      Object.entries(dataObj).filter(
+        ([_, val]) => val !== undefined && val !== ""
+      )
+    );
+
+    if (Object.keys(filteredDataObj).length === 0) {
+      output.error = "沒有要更新的資料";
+      return res.json(output);
+    }
+
+    console.log("filteredDataObj:", filteredDataObj);
+
+    const sql = `
+    UPDATE member_profile SET ? WHERE member_profile.member_id=?;
   `;
 
-  try {
-    const [result] = await db.query(sql, [filteredDataObj, originalData.member_id]);
+    try {
+      const [result] = await db.query(sql, [
+        filteredDataObj,
+        originalData.member_id,
+      ]);
+    
 
-    output.result = result;
-    output.success = !!result.changedRows;
+      // 確認是否有更新到資料
+      if (result.affectedRows > 0) {
+        output.success = true;
+        output.result = result;
+      } else {
+        output.success = false;
+        output.error = "資料更新失敗";
+      }
 
-    // 判斷有沒有上傳頭貼, 有的話刪掉之前的頭貼
-    if (req.file?.filename) {
-      removeUploadedImg(originalData.avatar);
+      // 判斷有沒有上傳頭貼, 有的話刪掉之前的頭貼
+      if (req.file?.filename) {
+        removeUploadedImg(originalData.avatar);
+      }
+    } catch (ex) {
+      if (req.file?.filename) {
+        removeUploadedImg(req.file.filename);
+      }
+      output.error = `資料庫操作錯誤: ${ex.message}`;
+      console.error(ex);
+      return res.json(output);
     }
-   
-  } catch (ex) {
-    if (req.file?.filename) {
-      removeUploadedImg(req.file.filename);
-    }
-    output.error = ex;
+
     return res.json(output);
   }
-  return res.json(output);
-});
+);
 
-export default router;
+export default profileRouter;
