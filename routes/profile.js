@@ -113,9 +113,6 @@ profileRouter.put(
         ? req.body.item
         : [];
 
-    if (typeof status === "string") {
-      req.body.status = status.toLowerCase() === "true";
-    }
 
     // 表單驗證
     const zResult = editSchema.safeParse(req.body);
