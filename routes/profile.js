@@ -92,7 +92,6 @@ profileRouter.put(
 
     // 先取到原本的項目資料
     const { success, error, data: originalData } = await getItemById(member_id);
-   
 
     if (originalData) {
       // 改用這個條件判斷
@@ -117,7 +116,6 @@ profileRouter.put(
     if (typeof status === "string") {
       req.body.status = status.toLowerCase() === "true";
     }
-    
 
     // 表單驗證
     const zResult = editSchema.safeParse(req.body);
@@ -182,7 +180,6 @@ profileRouter.put(
         filteredDataObj,
         originalData.member_id,
       ]);
-    
 
       // 確認是否有更新到資料
       if (result.affectedRows > 0) {
@@ -210,4 +207,23 @@ profileRouter.put(
   }
 );
 
+profileRouter.get("/auth", async (req, res) => {
+  const member_id = req.my_jwt?.id;
+
+  const Sql = `SELECT member.*, member_profile.avatar, member_profile.add_status 
+      FROM member 
+      LEFT JOIN member_profile ON member.member_id = member_profile.member_id 
+      WHERE member.member_id = ?`;
+  try {
+    const [result] = await db.query(sql, member_id);
+
+    if (!result.length) {
+      return res.status(404).json({ success: false, error: "找不到用戶" });
+    }
+
+    res.json({ success: true, data: result[0] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 export default profileRouter;
