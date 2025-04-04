@@ -2,6 +2,7 @@ import express from "express";
 import db from "../utils/connect-mysql.js";
 import fs from "node:fs/promises";
 import upload from "../utils/upload-images.js";
+import jwt from "jsonwebtoken";
 import { z } from "zod";
 
 const profileRouter = express.Router();
@@ -112,8 +113,10 @@ profileRouter.put(
         : Array.isArray(req.body.item)
         ? req.body.item
         : [];
-
-
+        
+    if (typeof status === "string") {
+      req.body.status = status.toLowerCase() === "true";
+    }
     // 表單驗證
     const zResult = editSchema.safeParse(req.body);
     // 如果資料驗證沒過
@@ -206,8 +209,21 @@ profileRouter.put(
 
 profileRouter.get("/auth", async (req, res) => {
   const member_id = req.my_jwt?.id;
+  const output = {
+    success: false,
+    result: null,
+    data: {
+      id: "",
+      account: "",
+      google_uid: "",
+      name: "",
+      add_status: "",
+      token: "",
+    },
+    error: "",
+  };
 
-  const Sql = `SELECT member.*, member_profile.avatar, member_profile.add_status 
+  const sql = `SELECT member.*, member_profile.avatar, member_profile.add_status 
       FROM member 
       LEFT JOIN member_profile ON member.member_id = member_profile.member_id 
       WHERE member.member_id = ?`;
@@ -217,8 +233,26 @@ profileRouter.get("/auth", async (req, res) => {
     if (!result.length) {
       return res.status(404).json({ success: false, error: "找不到用戶" });
     }
+    output.success = true;
+    const token = jwt.sign(
+      {
+        id: result[0].member_id,
+        account: result[0].email,
+        google_uid: result[0].google_uid,
+      },
+      process.env.JWT_KEY,
+      { expiresIn: "7d" }
+    );
 
-    res.json({ success: true, data: result[0] });
+    output.data = {
+      id: result[0].member_id,
+      account: result[0].email,
+      google_uid: result[0].google_uid,
+      name: result[0].name,
+      add_status: result[0].add_status,
+      token,
+    };
+    res.json(output);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
