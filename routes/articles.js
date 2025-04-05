@@ -116,14 +116,14 @@ router.get("/api/allFav", async function (req, res) {
     }
     const perPage = output.perPage;
     let page = +req.query.page || 1;
-    output.page = page
+    output.page = page;
     try {
         const t_sql = `SELECT count(*) AS total FROM article_favorites LEFT JOIN articles on article_favorites.article_id = articles.id  ${where} ;`;
         const [total] = await db.query(t_sql, [member_id]);
         output.totalRows = total[0].total;
         // 計算總頁數
         const totalPages = Math.ceil(total[0].total / perPage);
-        output.totalPages = totalPages
+        output.totalPages = totalPages;
         if (page > totalPages) {
             output.redirect = `?page=${totalPages}`;
             return output;
@@ -347,6 +347,7 @@ router.get("/api/recommand/:articleid", async function (req, res) {
     // return res.json(output);
     const articleid = Number(req.params.articleid);
     const member_id = req.my_jwt?.id;
+    
     let articles = [];
     if (member_id) {
         [articles] = await db.query(`SELECT * 
@@ -354,7 +355,7 @@ router.get("/api/recommand/:articleid", async function (req, res) {
         LEFT JOIN article_categories 
             ON articles.category_id = article_categories.id
         LEFT JOIN article_favorites ON articles.id = article_favorites.article_id
-        WHERE parent_id = (
+        WHERE (parent_id = (
             SELECT parent_id 
             FROM articles 
             LEFT JOIN article_categories 
@@ -365,7 +366,7 @@ router.get("/api/recommand/:articleid", async function (req, res) {
                 WHERE id = ${articleid}
             )
             LIMIT 1
-        );`);
+        ))AND (article_favorites.member_id IS NULL OR article_favorites.member_id = ${member_id});`);
     } else {
         [articles] = await db.query(
             `SELECT * 
