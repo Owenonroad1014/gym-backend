@@ -41,13 +41,14 @@ export const pfSchema = z
       .refine((val) => val.length <= 5, { message: "最多可選五項運動項目" }), // 陣列最多 5 項
     goal: z.array(z.string()).optional(),
     status: z.boolean(),
+    intro: z.string().optional(),
   })
   .refine(
     (data) => {
       if (data.status === true) {
         // Correctly check intro length after trimming whitespace
         const trimmedIntro = data.intro ? data.intro.trim() : "";
-        if (trimmedIntro.length <= 30) {
+        if (trimmedIntro.length < 30) {
           return false;
         }
       }
