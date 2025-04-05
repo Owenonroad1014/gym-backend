@@ -87,7 +87,6 @@ app.use((req, res, next) => {
 });
 
 // 定義路由
-// app.use('/api/auth',googleLoginRouter)
 app.use("/register", registerRouter);
 app.use("/forget-password", mailRouter);
 app.use("/change-password", changePassRouter);
@@ -296,8 +295,7 @@ app.post("/api/auth/google-login", async (req, res) => {
     bodyData: req.body,
     data: {
       id: 0,
-      uid: "",
-      avatar: "",
+      google_uid: "",
       name: "",
       token: "",
     },
@@ -343,7 +341,7 @@ app.post("/api/auth/google-login", async (req, res) => {
     }
 
     const [result] = await db.query(
-      `SELECT member.*, member_profile.avatar, member_profile.add_status FROM member LEFT JOIN member_profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
+      `SELECT member.*, member_profile.add_status FROM member LEFT JOIN member_profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
       [google_uid]
     );
 
@@ -367,7 +365,6 @@ app.post("/api/auth/google-login", async (req, res) => {
       id: result[0].member_id,
       account: result[0].email,
       google_uid: result[0].google_uid,
-      avatar: result[0].avatar,
       name: result[0].name,
       add_status: result[0].add_status,
       token,
@@ -388,7 +385,6 @@ app.post("/login-jwt", async (req, res) => {
     data: {
       id: 0,
       account: "",
-      avatar: "",
       name: "",
       token: "",
     },
@@ -402,7 +398,7 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const sql =
-    "SELECT member.*, member_profile.avatar,member_profile.add_status FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id WHERE email = ?";
+    "SELECT member.*, member_profile.add_status FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id WHERE email = ?";
   const [rows] = await db.query(sql, [account]);
   if (!rows.length) {
     output.error = "帳號或密碼錯誤";
@@ -411,9 +407,6 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const row = rows[0];
-  // const avatarUrl = row.avatar
-  //   ? `/img/avatar/${row.avatar}`
-  //   : "";
   const result = await bcrypt.compare(password, row.password_hash);
   if (!result) {
     output.error = "帳號或密碼錯誤";
@@ -432,7 +425,6 @@ app.post("/login-jwt", async (req, res) => {
   output.data = {
     id: row.member_id,
     account: row.email,
-    avatar: row.avatar,
     name: row.name,
     add_status:row.add_status,
     token,
