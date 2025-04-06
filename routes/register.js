@@ -126,6 +126,7 @@ router.put("/api/profile", upload.single("avatar"), async (req, res) => {
   const output = {
     success: false,
     bodyData: req.body,
+    data: null,
     result: null,
     error: "",
   };
@@ -191,7 +192,8 @@ router.put("/api/profile", upload.single("avatar"), async (req, res) => {
         .replace(/^[\s、,]+|[\s、,]+$/g, "")
     : "";
   dataObj.goal = goal ? [].concat(goal).filter(Boolean).join(",") : "";
-
+  dataObj.add_status = 1;
+  
   const sql1 = `
     UPDATE member_profile SET ? WHERE member_profile.member_id=?;
   `;

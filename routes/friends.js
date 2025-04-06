@@ -81,63 +81,6 @@ router.get("/api", async (req, res) => {
 });
 
 // 刪除好友列表
-router.delete("/api/delete", async (req, res) => {
-    const member_id = req.my_jwt?.id;
-    const { user } = req.body;
-    const output = {
-        success: false,
-        data: [],
-        error: "",
-    };
-    //  登入
-    if (!member_id) {
-        output.error = "需要登入會員";
-        return res.json(output);
-    }
-    // 好友
-    if (!user) {
-        output.error = "沒有此好友";
-        return res.json(output);
-    }
-    const sqlDelete = `DELETE FROM friendships
-        WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id =?);`;
-    try {
-        const [result] = await db.query(sqlDelete, [
-            member_id,
-            user,
-            user,
-            member_id,
-        ]);
-        if (result.affectedRows > 0) {
-            output.success = true;
-            output.data = result;
-            output.status = "成功刪除";
-            // 確認是否有聊天室
-            const sqlensure = `SELECT * FROM chats WHERE (user1_id = ? AND user2_id = ?)OR(user1_id = ? AND user2_id = ?);`;
-            const [ensure] = await db.query(sqlensure, [
-                member_id,
-                user,
-                user,
-                member_id,
-            ]);
-
-            if (ensure.length > 0) {
-                const deleteColumn =
-                    ensure[0].user1_id === member_id
-                        ? "user1_delete"
-                        : "user2_delete";
-                const sqlDeleteChat = `UPDATE chats SET ${deleteColumn} = 1 WHERE id = ?;`;
-                await db.query(sqlDeleteChat, [ensure[0].id]);
-            }
-        } else {
-            output.error = "未找到好友關係，無法刪除";
-        }
-        res.json(output);
-    } catch (err) {
-        output.error = "無法刪除";
-        res.json(output);
-    }
-});
 router.post("/api/delete", async (req, res) => {
     const member_id = req.my_jwt?.id;
     const { user } = req.body;
@@ -225,7 +168,10 @@ router.get("/api/invite", async (req, res) => {
     const [[{ totalRows }]] = await db.query(t_sql, [member_id]); // 取得總筆數
     output.totalRows = totalRows;
     const sql = `
-    SELECT friend_requests.* , member.name AS sender_name FROM friend_requests left join member on friend_requests.sender_id = member.member_id WHERE receiver_id=? AND status="pending" `;
+    SELECT friend_requests.* , m1.name AS sender_name,m1.avatar AS sender_avatar FROM friend_requests 
+    left join (SELECT member.member_id,name,avatar FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id) m1 
+    on friend_requests.sender_id = m1.member_id 
+    WHERE receiver_id= ? AND status="pending"; `;
     const [data] = await db.query(sql, [member_id]);
     if (!data.length) {
         output.error = "沒有好友邀請";
@@ -266,8 +212,8 @@ router.post("/api/request", async (req, res) => {
         output.error = "已發送過請求";
         return res.json(output);
     }
-    const sqlaccept = `SELECT * FROM  friend_requests WHERE sender_id=? AND receiver_id =? AND status="accepted" `;
-    const [acceptrows] = await db.query(sqlaccept, [member_id, receiver_id]);
+    const sqlaccept = `SELECT * FROM  friend_requests WHERE (sender_id=? AND receiver_id =?) OR (sender_id=? AND receiver_id =?) AND status="accepted" `;
+    const [acceptrows] = await db.query(sqlaccept, [member_id, receiver_id,receiver_id,member_id]);
     if (acceptrows.length) {
         output.error = "已是好友";
         return res.json(output);
@@ -324,14 +270,14 @@ router.post("/api/accept", async (req, res) => {
             const addsql = `INSERT INTO chats (user1_id,user2_id) VALUES (?,?);`;
             await db.query(addsql, [member_id, sender_id]);
             const findchatroomsql = `SELECT id chat_id FROM chats WHERE user1_id = ? AND user2_id = ?`;
-            const [{ chat_id }] = await db.query(findchatroomsql, [
+            const [ chat_id ] = await db.query(findchatroomsql, [
                 member_id,
                 sender_id,
             ]);
             const invitesql = `INSERT INTO messages (chat_id,sender_id,message) VALUES (?,?,'邀請你一起運動吧!!');`;
-            console.log(chat_id, sender_id);
+            console.log(chat_id[0].chat_id, sender_id);
 
-            await db.query(invitesql, [chat_id, sender_id]);
+            await db.query(invitesql, [chat_id[0].chat_id, sender_id]);
             output.success = true;
             output.updateStatus = "已成為好友";
             output.chatroom = "已創建";

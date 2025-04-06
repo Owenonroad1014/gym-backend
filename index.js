@@ -2,6 +2,7 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import session from "express-session";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import mysql_session from "express-mysql-session";
 import moment from "moment-timezone";
 import cors from "cors";
@@ -19,13 +20,15 @@ import friendsRouter from "./routes/friends.js";
 import classesRouter from "./routes/classes.js";
 import locationsRouter from "./routes/locations.js";
 import registerRouter from "./routes/register.js";
-// import googleLoginRouter from './routes/google-login.js'
+import cartsRouter from "./routes/carts.js";
+import ecpayRouter from "./routes/ecpay-test-only.js";
 import chatsRouter from "./routes/chats.js";
 import gymfriendsRouter from "./routes/gymfriends.js";
 import memberCenterRouter from "./routes/member-center.js";
-import mailRouter from './routes/mail.js'
-import changePassRouter from './routes/change-password.js'
-import profileRouter from './routes/profile.js'
+import mailRouter from "./routes/mail.js";
+import changePassRouter from "./routes/change-password.js";
+import profileRouter from "./routes/profile.js";
+import emailRouter from "./routes/email.js";
 
 const MysqlStore = mysql_session(session);
 const sessionStore = new MysqlStore({}, db);
@@ -84,24 +87,24 @@ app.use((req, res, next) => {
 });
 
 // 定義路由
-// app.use('/api/auth',googleLoginRouter)
 app.use("/register", registerRouter);
-app.use('/forget-password',mailRouter)
-app.use("/change-password", changePassRouter)
-app.use('/api/member',profileRouter)
+app.use("/forget-password", mailRouter);
+app.use("/change-password", changePassRouter);
 app.use("/admin2", admin2Router);
 app.use("/address-book", abRouter);
 app.use("/coaches", coachesRouter);
 app.use("/products", productsRouter);
-app.use("/videos", videosRouter);
+app.use("/carts", cartsRouter);
 app.use("/classes", classesRouter);
 app.use("/articles", articlesRouter);
 app.use("/friends", friendsRouter);
 app.use("/locations", locationsRouter);
+app.use("/ecpay", ecpayRouter);
 app.use("/gymfriends", gymfriendsRouter);
 app.use("/chats", chatsRouter);
 app.use("/memberCenter", memberCenterRouter);
-
+app.use("/profile", profileRouter);
+app.use("/email", emailRouter);
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;
@@ -284,6 +287,95 @@ app.get("/try-jwt2", (req, res) => {
   }
 });
 
+app.post("/api/auth/google-login", async (req, res) => {
+  const output = {
+    success: false,
+    error: "",
+    code: 0,
+    bodyData: req.body,
+    data: {
+      id: 0,
+      google_uid: "",
+      name: "",
+      token: "",
+    },
+    insertUid: null,
+    profileResult: null,
+  };
+
+  const { google_uid, email, name, avatar } = req.body;
+
+  const length = 12;
+  const password = crypto
+    .randomBytes(length)
+    .toString("base64")
+    .slice(0, length);
+  const password_hash = await bcrypt.hash(password, 12);
+
+  const add_status = 0;
+  try {
+    // 檢查資料庫是否已有此用戶
+    const [user] = await db.query("SELECT * FROM member WHERE email = ?", [
+      email,
+    ]);
+
+    if (!user.length) {
+      // 若無此用戶，則新增
+      const [sql1] = await db.query(
+        "INSERT INTO member (google_uid, name, email,password_hash) VALUES (?, ?, ?, ?)",
+        [google_uid, name, email, password_hash]
+      );
+      if (sql1.affectedRows) {
+        const [sql2] = await db.query(
+          "INSERT INTO member_profile (member_id,avatar,add_status) VALUES (?,?,?)",
+          [sql1.insertId, avatar, add_status]
+        );
+        output.profileResult = !!sql2.affectedRows;
+      }
+    } else if (!user[0].google_uid) {
+      const [sql3] = await db.query(
+        `UPDATE member SET google_uid=? WHERE email=?  AND google_uid IS NULL`,
+        [google_uid, email]
+      );
+      output.insertUid = !!sql3.affectedRows;
+    }
+
+    const [result] = await db.query(
+      `SELECT member.*, member_profile.add_status FROM member LEFT JOIN member_profile ON member.member_id = member_profile.member_id WHERE google_uid=?`,
+      [google_uid]
+    );
+
+    if (!result || result.length === 0) {
+      output.error = "沒有該用戶";
+      return res.status(404).json({ output });
+    }
+
+    const token = jwt.sign(
+      {
+        id: result[0].member_id,
+        account: result[0].email,
+        google_uid: result[0].google_uid,
+      },
+      process.env.JWT_KEY,
+      { expiresIn: "7d" }
+    );
+
+    output.success = true; // 登入成功
+    output.data = {
+      id: result[0].member_id,
+      account: result[0].email,
+      google_uid: result[0].google_uid,
+      name: result[0].name,
+      add_status: result[0].add_status,
+      token,
+    };
+    return res.json(output);
+  } catch (error) {
+    output.error = error.message;
+    res.status(500).json(output);
+  }
+});
+
 app.post("/login-jwt", async (req, res) => {
   let { account, password } = req.body || {};
   const output = {
@@ -293,8 +385,7 @@ app.post("/login-jwt", async (req, res) => {
     data: {
       id: 0,
       account: "",
-      avatar: "",
-      name:"",
+      name: "",
       token: "",
     },
   };
@@ -307,7 +398,7 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const sql =
-    "SELECT member.*, member_profile.avatar FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id WHERE email = ?";
+    "SELECT member.*, member_profile.add_status FROM member LEFT JOIN member_profile on member.member_id = member_profile.member_id WHERE email = ?";
   const [rows] = await db.query(sql, [account]);
   if (!rows.length) {
     output.error = "帳號或密碼錯誤";
@@ -316,9 +407,6 @@ app.post("/login-jwt", async (req, res) => {
   }
 
   const row = rows[0];
-  // const avatarUrl = row.avatar
-  //   ? `/img/avatar/${row.avatar}`
-  //   : "";
   const result = await bcrypt.compare(password, row.password_hash);
   if (!result) {
     output.error = "帳號或密碼錯誤";
@@ -337,8 +425,8 @@ app.post("/login-jwt", async (req, res) => {
   output.data = {
     id: row.member_id,
     account: row.email,
-    avatar: row.avatar,
-    name:row.name,
+    name: row.name,
+    add_status:row.add_status,
     token,
   };
   res.json(output);
