@@ -163,10 +163,13 @@ router.post("/api/deleteChatroom", async (req, res) => {
 // 獲取聊天內容
 router.get("/api/chatroom/:chatroomid", async (req, res) => {
     const chatroomid = req.params.chatroomid;
+    const member_id = req.my_jwt?.id;
+
     const output = {
         success: false,
         data: [],
         error: "",
+        read:[]
     };
     try {
         const sql = `SELECT * FROM chats WHERE id = ?`;
@@ -178,8 +181,16 @@ router.get("/api/chatroom/:chatroomid", async (req, res) => {
         }
         const msgsql = `SELECT messages.*, member.name sender_name FROM messages LEFT JOIN member ON sender_id = member.member_id  WHERE chat_id = ? ORDER BY created_at LIMIT 30 ;`;
         const [result] = await db.query(msgsql, [chatroomid]);
+        const messageIds = result
+        .filter(msg => msg.sender_id !== member_id)  
+        .map(msg => msg.id); 
+        console.log(messageIds);
+        
+        const readsql = `UPDATE messages SET is_read = TRUE WHERE id IN (?) ;`;
+        const [read] = await db.query(readsql,[messageIds]);
         output.data = result;
         output.success = true;
+        output.read = read
         return res.json(output);
     } catch (err) {
         console.error("Error occurred:", err);
