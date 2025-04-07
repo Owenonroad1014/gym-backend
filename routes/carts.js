@@ -5,6 +5,14 @@ import db from "../utils/connect-mysql.js";
 
 const router = express.Router();
 
+function getRentalDays(startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffTime = end - start;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > 0 ? diffDays : 1; // 至少一天
+}
+
 
 
 router.post("/api", async (req, res) => {
@@ -61,10 +69,16 @@ router.post("/api", async (req, res) => {
 
     await connection.query(itemSql, [itemValues]);
 
+    const orderAmount = items.reduce((total, item) => {
+      const rentalDays = getRentalDays(item.rentalStartDate, item.rentalEndDate);
+      return total + parseFloat(item.price) * item.quantity * rentalDays;
+    }, 0);
+
     await connection.commit();
     res.json({ 
       orderId, 
       message: "訂單提交成功",
+      orderAmount,
       customerInfo: {
         name: customerInfo.name,
         phone: customerInfo.phone,
@@ -83,6 +97,73 @@ router.post("/api", async (req, res) => {
     if (connection) connection.release();
   }
 });
+
+
+// 歷史訂單
+
+router.get("/:memberId/api", async (req, res) => {
+  const memberId = req.params.memberId;
+  //const member_id = req.my_jwt?.id;
+  try {
+    // 撈出會員所有訂單
+    const [orders] = await db.query(
+      `SELECT 
+         o.order_id,
+         o.status,
+         o.payment_status,
+         o.payment_method,
+         o.pickup_method,
+         o.customer_name,
+         o.customer_email,
+         o.customer_phone,
+         o.added_at
+       FROM orders o
+       WHERE o.member_id = ?
+       ORDER BY o.added_at DESC
+      `,
+      [memberId]
+    );
+
+    if (orders.length === 0) {
+      return res.json([]);
+    }
+
+    const orderIds = orders.map(o => o.order_id);
+
+    // 撈出所有相關的 order_items
+    const [items] = await db.query(
+      `SELECT 
+         oi.order_id,
+         p.name AS product_name,
+         oi.rental_start_date,
+         oi.rental_end_date,
+         oi.quantity,
+         oi.price,
+         oi.total_price
+       FROM order_items oi
+       JOIN products p ON oi.product_id = p.id
+       WHERE oi.order_id IN (?)
+      `,
+      [orderIds]
+    );
+
+    // 把 order_items 塞回對應的訂單
+    const ordersWithItems = orders.map(order => {
+      const orderItems = items.filter(item => item.order_id === order.order_id);
+      return {
+        ...order,
+        items: orderItems
+      };
+    });
+
+    res.json(ordersWithItems);
+
+  } catch (error) {
+    console.error("取得會員訂單失敗：", error);
+    res.status(500).json({ message: "伺服器錯誤", error: error.message });
+  }
+});   
+
 
 // SELECT 
 //     m.member_id, 
