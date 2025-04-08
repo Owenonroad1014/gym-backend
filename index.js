@@ -52,17 +52,17 @@ const corsOptions = {
   },
 };
 app.use(cors(corsOptions));
-app.use(
-  session({
-    saveUninitialized: false,
-    resave: false,
-    secret: "sdkgh9845793KUKJ87453894",
-    // cookie: {
-    // maxAge: 1200_000
-    // }
-    store: sessionStore,
-  })
-);
+// app.use(
+//   session({
+//     saveUninitialized: false,
+//     resave: false,
+//     secret: "sdkgh9845793KUKJ87453894",
+//     // cookie: {
+//     // maxAge: 1200_000
+//     // }
+//     store: sessionStore,
+//   })
+// );
 
 // **** 自訂的 top-level middlewares ****
 app.use((req, res, next) => {
@@ -105,6 +105,7 @@ app.use("/chats", chatsRouter);
 app.use("/memberCenter", memberCenterRouter);
 app.use("/profile", profileRouter);
 app.use("/email", emailRouter);
+app.use("/videos", videosRouter);
 
 app.get("/", (req, res) => {
   res.locals.title = "首頁 - " + res.locals.title;

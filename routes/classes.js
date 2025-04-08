@@ -55,7 +55,7 @@ const getCalendarData = async (req) => {
         JOIN locations l ON c.location_id = l.id
         LEFT JOIN coaches co ON c.coach_id = co.id
         LEFT JOIN class_types ct ON c.type_id = ct.id
-        LEFT JOIN class_categories cc ON c.category_id = cc.id
+        LEFT JOIN class_categories cc ON ct.category_id = cc.id
         WHERE 1=1
         ${location ? " AND l.location = ?" : ""}
         ${branch ? " AND l.branch = ?" : ""}

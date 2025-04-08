@@ -74,7 +74,7 @@ async function checkUpcomingClasses() {
 }
 
 // 設定每5分鐘執行一次通知
-schedule.scheduleJob("*/5 * * * *", checkUpcomingClasses);
+schedule.scheduleJob("*/2 * * * *", checkUpcomingClasses);
 
 // 測試用 API 端點
 emailRouter.post("/test-email", async (req, res) => {
