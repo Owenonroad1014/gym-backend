@@ -36,7 +36,6 @@ const getChatsList = async (req) => {
 
         let rows = [];
         if (totalRows > 0) {
-            
             // 獲取聊天室
             const sql = `SELECT 
                 chats.*,
@@ -68,13 +67,9 @@ const getChatsList = async (req) => {
                 WHERE 
                 user1_id = ? OR user2_id = ? ORDER BY newmsg.newMsgTime desc
             ;`;
-           
-            
-            
-            [rows] = await db.query(sql, [member_id, member_id,member_id]);
-            
+
+            [rows] = await db.query(sql, [member_id, member_id, member_id]);
         }
-        
 
         return { ...output, totalRows, totalPages, page, rows, success: true };
     } catch (err) {
@@ -169,7 +164,7 @@ router.get("/api/chatroom/:chatroomid", async (req, res) => {
         success: false,
         data: [],
         error: "",
-        read:[]
+        read: [],
     };
     try {
         const sql = `SELECT * FROM chats WHERE id = ?`;
@@ -182,15 +177,16 @@ router.get("/api/chatroom/:chatroomid", async (req, res) => {
         const msgsql = `SELECT messages.*, member.name sender_name FROM messages LEFT JOIN member ON sender_id = member.member_id  WHERE chat_id = ? ORDER BY created_at LIMIT 30 ;`;
         const [result] = await db.query(msgsql, [chatroomid]);
         const messageIds = result
-        .filter(msg => msg.sender_id !== member_id)  
-        .map(msg => msg.id); 
-        console.log(messageIds);
-        
-        const readsql = `UPDATE messages SET is_read = TRUE WHERE id IN (?) ;`;
-        const [read] = await db.query(readsql,[messageIds]);
+            .filter((msg) => msg.sender_id !== member_id)
+            .map((msg) => msg.id);
+        // console.log(messageIds);
+        if (messageIds.length > 0) {
+            const readsql = `UPDATE messages SET is_read = TRUE WHERE id IN (?) ;`;
+            const [read] = await db.query(readsql, [messageIds]);
+            output.read = read;
+        }
         output.data = result;
         output.success = true;
-        output.read = read
         return res.json(output);
     } catch (err) {
         console.error("Error occurred:", err);
@@ -255,15 +251,15 @@ router.post("/api/readMsg", async (req, res) => {
     try {
         // 確認聊天訊息和聊天室
         const sqlchat = `SELECT  messages.id FROM messages left join chats on messages.chat_id  = chats.id where chat_id =? AND sender_id != ? AND messages.is_read = FALSE ;`;
-        const [messages] = await db.query(sqlchat, [chat_id,member_id]);
+        const [messages] = await db.query(sqlchat, [chat_id, member_id]);
         if (messages.length <= 0) {
             output.error = "訊息不存在";
             return res.json(output);
         }
-        const messageIds = messages.map(msg => msg.id);
+        const messageIds = messages.map((msg) => msg.id);
         // 將更新已讀訊息
         const sql = `UPDATE messages SET is_read = TRUE WHERE id IN (?);`;
-        const [result] = await db.query(sql,[messageIds]);
+        const [result] = await db.query(sql, [messageIds]);
 
         if (result.affectedRows > 0) {
             output.success = true;
