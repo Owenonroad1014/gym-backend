@@ -15,7 +15,7 @@ router.get('/', function (req, res) {
   const itemName =
     items.split(',').length > 1
       ? items.split(',').join('#')
-      : '線上商店購買一批'
+      : '健身器材租賃一批'
 
   if (isDev) console.log('amount:', amount)
   if (isDev) console.log('items:', items)
@@ -53,7 +53,7 @@ router.get('/', function (req, res) {
   const stage = isStage ? '-stage' : ''
   const algorithm = 'sha256'
   const digest = 'hex'
-  const APIURL = `https://payment${stage}.ecpay.com.tw//Cashier/AioCheckOut/V5`
+  const APIURL = `https://payment${stage}.ecpay.com.tw/Cashier/AioCheckOut/V5`
   const MerchantTradeNo = `od${new Date().getFullYear()}${(
     new Date().getMonth() + 1
   )
@@ -94,7 +94,7 @@ router.get('/', function (req, res) {
     ItemName: ItemName,
     ReturnURL: ReturnURL,
     ChoosePayment: ChoosePayment,
-    // OrderResultURL,
+    //OrderResultURL,
     ClientBackURL,
   }
 
@@ -180,11 +180,13 @@ router.get('/', function (req, res) {
   // 送至react前端，由前端產生表單控制送出的動作
   // 這是為了在前端可以更靈活的控制送出的動作
   // action: 表單送出的網址, params: 所有表單中的欄位參數值
-  // successResponse(res, { action: APIURL, params: AllParams })
+  //successResponse(res, { action: APIURL, params: AllParams })
 })
 
 
-router.post('/api', async (req, res) => {
+
+
+router.post('/ecpay/api', async (req, res) => {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -238,4 +240,6 @@ router.post('/api', async (req, res) => {
     if (connection) connection.release();
   }
 });
+
+
 export default router

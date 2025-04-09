@@ -165,6 +165,44 @@ router.get("/:memberId/api", async (req, res) => {
 });   
 
 
+// 取消訂單 API
+router.post("/:orderId/cancel", async (req, res) => {
+  const orderId = req.params.orderId;
+
+  try {
+    // 先查詢訂單是否存在
+    const [orders] = await db.query(
+      `SELECT status FROM orders WHERE order_id = ?`,
+      [orderId]
+    );
+
+    if (orders.length === 0) {
+      return res.status(404).json({ message: "找不到此訂單" });
+    }
+
+    const currentStatus = orders[0].status;
+
+    // 只能取消「已下單」狀態的訂單
+    if (currentStatus !== "已下單") {
+      return res.status(400).json({ message: "此訂單無法取消" });
+    }
+
+    // 更新訂單狀態為「已取消」
+    await db.query(
+      `UPDATE orders SET status = '已取消' WHERE order_id = ?`,
+      [orderId]
+    );
+
+    res.json({ message: "訂單已取消成功" });
+
+  } catch (error) {
+    console.error("取消訂單失敗：", error);
+    res.status(500).json({ message: "伺服器錯誤", error: error.message });
+  }
+});
+
+
+
 // SELECT 
 //     m.member_id, 
 //     m.name, 
