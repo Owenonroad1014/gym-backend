@@ -8,7 +8,7 @@ const dateFormat = "YYYY-MM-DD";
 const getCalendarData = async (req) => {
   const output = {
     success: false,
-    perPage: 30,
+    perPage: 200,
     totalRows: 0,
     totalPages: 0,
     page: 0,
