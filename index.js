@@ -31,7 +31,7 @@ import profileRouter from "./routes/profile.js";
 import emailRouter from "./routes/email.js";
 
 const MysqlStore = mysql_session(session);
-const sessionStore = new MysqlStore({}, db);
+// const sessionStore = new MysqlStore({}, db);
 
 const app = express();
 
