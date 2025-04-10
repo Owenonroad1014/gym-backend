@@ -117,34 +117,35 @@ router.get("/api/allFav", async function (req, res) {
     const perPage = output.perPage;
     let page = +req.query.page || 1;
     output.page = page;
+    
     try {
         const t_sql = `SELECT count(*) AS total FROM article_favorites LEFT JOIN articles on article_favorites.article_id = articles.id  ${where} ;`;
-        const [total] = await db.query(t_sql, [member_id]);
-        output.totalRows = total[0].total;
-        // 計算總頁數
-        const totalPages = Math.ceil(total[0].total / perPage);
+        const [totalrows] = await db.query(t_sql, [member_id]);
+        console.log(totalrows);
+        output.totalRows = totalrows[0].total;
+        if (totalrows[0].total == 0) {
+            output.error = "沒有收藏的文章"
+            return res.json(output);
+        }
+        //計算總頁數
+        const totalPages = Math.ceil(totalrows[0].total / perPage);
         output.totalPages = totalPages;
         if (page > totalPages) {
             output.redirect = `?page=${totalPages}`;
             return output;
         }
-
-        if (total[0].total > 0) {
-            // 確保頁碼不超過總頁數
-            if (page > totalPages) {
-                output.redirect = `?page=${totalPages}`;
-                return output;
-            }
-            // 獲取文章列表並檢查是否有收藏的資訊
-            if (member_id) {
-                const sql = `SELECT * FROM article_favorites LEFT JOIN articles on article_favorites.article_id = articles.id   ${where};`;
-                const [result] = await db.query(sql, [member_id]);
-                output.success = true;
-                output.data = result;
-                if (result.length <= 0) {
-                    output.error = "沒有收藏";
-                }
-            }
+        //確保頁碼不超過總頁數
+        if (page > totalPages) {
+            output.redirect = `?page=${totalPages}`;
+            return output;
+        }
+        
+        //獲取文章列表並檢查是否有收藏的資訊
+        if (member_id) {
+            const sql = `SELECT * FROM article_favorites LEFT JOIN articles on article_favorites.article_id = articles.id   ${where};`;
+            const [result] = await db.query(sql, [member_id]);
+            output.success = true;
+            output.data = result;
         }
 
         return res.json(output);
@@ -347,7 +348,7 @@ router.get("/api/recommand/:articleid", async function (req, res) {
     // return res.json(output);
     const articleid = Number(req.params.articleid);
     const member_id = req.my_jwt?.id;
-    
+
     let articles = [];
     if (member_id) {
         [articles] = await db.query(`SELECT * 
