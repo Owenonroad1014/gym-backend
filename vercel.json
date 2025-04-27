@@ -1,6 +1,4 @@
 {
-    
-
     "version": 2,
     "builds": [
       {
@@ -16,7 +14,7 @@
     ],
     "headers": [
       {
-        "source": "/api/(.*)",
+        "src": "/api/(.*)",
         "headers": [
           { "key": "Access-Control-Allow-Origin", "value": "https://gym-next-gamma.vercel.app" },
           { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
@@ -25,6 +23,4 @@
       }
     ]
   }
-  
-  
   
