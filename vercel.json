@@ -1,20 +1,22 @@
 {
+    
+
     "version": 2,
     "builds": [
       {
-        "src": "index.js",
+        "source": "index.js",
         "use": "@vercel/node"
       }
     ],
     "routes": [
       {
-        "src": "/(.*)",
+        "source": "/(.*)",
         "dest": "index.js"
       }
     ],
     "headers": [
       {
-        "src": "/api/(.*)",
+        "source": "/api/(.*)",
         "headers": [
           { "key": "Access-Control-Allow-Origin", "value": "https://gym-next-gamma.vercel.app" },
           { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
@@ -23,4 +25,6 @@
       }
     ]
   }
+  
+  
   
