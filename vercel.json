@@ -6,17 +6,27 @@
         "use": "@vercel/node"
       },
       {
-        "src": "public/**",
+        "src": "public/**/*",
         "use": "@vercel/static"
       }
     ],
     "routes": [
+      {
+        "src": "/public/img/(.*)",
+        "dest": "/public/img/$1"
+      },
+      {
+        "src": "/public/img/avatar/(.*)",
+        "dest": "/public/img/avatar/$1"
+      },
+      {
+        "src": "/public/imgs/(.*)",
+        "dest": "/public/imgs/$1"
+      },
       {
         "src": "/(.*)",
         "dest": "/"
       }
     ]
   }
-  
-  
   
