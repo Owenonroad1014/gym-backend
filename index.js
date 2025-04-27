@@ -46,10 +46,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 const corsOptions = {
   credentials: true,
-  origin: (origin, callback) => {
-    // console.log({ origin });
-    callback(null, true);
-  },
+  origin: ["https://gym-next-gamma.vercel.app"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 app.use(cors(corsOptions));
 // app.use(
@@ -427,7 +426,7 @@ app.post("/login-jwt", async (req, res) => {
     id: row.member_id,
     account: row.email,
     name: row.name,
-    add_status:row.add_status,
+    add_status: row.add_status,
     token,
   };
   res.json(output);

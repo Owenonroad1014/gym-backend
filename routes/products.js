@@ -74,7 +74,7 @@ const getListData = async (req) => {
   // 取得總筆數
   const t_sql = `  SELECT COUNT(1) AS totalRows 
   FROM products p 
-  JOIN Categories c ON p.category_id = c.id 
+  JOIN categories c ON p.category_id = c.id 
   ${where} `;
   const [[{ totalRows }]] = await db.query(t_sql); 
 
@@ -103,10 +103,10 @@ const getListData = async (req) => {
       SELECT p.id, p.product_code, p.name AS product_name, p.description, 
       c.category_name, p.price, p.image_url, p.average_rating, 
       p.created_at, l.like_id
-        FROM Products p LEFT JOIN (
+        FROM products p LEFT JOIN (
         SELECT * FROM favorites WHERE member_id = ${memberId}
         )l ON p.id = l.product_id left
-        JOIN Categories c ON p.category_id = c.id
+        JOIN categories c ON p.category_id = c.id
         ${where} 
         ORDER BY p.id 
         LIMIT ${(page - 1) * perPage}, ${perPage}
@@ -115,8 +115,8 @@ const getListData = async (req) => {
         SELECT p.id, p.product_code, p.name AS product_name, p.description, 
         c.category_name, p.price, p.image_url, p.average_rating, 
         p.created_at
-        FROM Products p
-        JOIN Categories c ON p.category_id = c.id
+        FROM products p
+        JOIN categories c ON p.category_id = c.id
         ${where} 
         ORDER BY p.id 
         LIMIT ${(page - 1) * perPage}, ${perPage}
@@ -178,9 +178,9 @@ router.get("/api/favorites", async (req, res) => {
         p.average_rating, 
         c.category_name, 
         p.created_at
-      FROM Favorites f
-      JOIN Products p ON f.product_id = p.id
-      JOIN Categories c ON p.category_id = c.id
+      FROM favorites f
+      JOIN products p ON f.product_id = p.id
+      JOIN categories c ON p.category_id = c.id
       WHERE f.member_id = ? 
       ORDER BY f.created_at DESC
     `;
@@ -386,7 +386,7 @@ router.get("/api/:productId", async (req, res) => {
     return res.json({ success: false, error: "無效的商品 ID" });
   }
   const memberId = req.my_jwt?.id; 
-  const output = { success: false, data: null, relatedProducts: [] ,like_id : null, memberId : memberId};
+  const output = { success: false, data: null, relatedproducts: [] ,like_id : null, memberId : memberId};
 
 
 
@@ -404,9 +404,9 @@ router.get("/api/:productId", async (req, res) => {
       JSON_ARRAYAGG(
         JSON_OBJECT('variant_id', pv.id, 'weight', pv.weight, 'image_url', pv.image_url)
       ) AS variants
-      FROM Products p
-      JOIN Categories c ON p.category_id = c.id
-      LEFT JOIN ProductVariants pv ON p.id = pv.product_id
+      FROM products p
+      JOIN categories c ON p.category_id = c.id
+      LEFT JOIN productvariants pv ON p.id = pv.product_id
       WHERE p.id = ?
       GROUP BY p.id, p.product_code, p.name, p.description, c.category_name, 
          p.price, p.image_url, p.average_rating, p.created_at;
@@ -420,10 +420,10 @@ router.get("/api/:productId", async (req, res) => {
       
 
       // 檢查所有 variants 是否 weight 為 null
-      let hasValidVariants = productData.variants.some(variant => variant.weight !== null);
+      let hasValidvariants = productData.variants.some(variant => variant.weight !== null);
 
       // 如果所有 weight 都是 null，就設為 null
-      productData.variants = hasValidVariants ? productData.variants : null;
+      productData.variants = hasValidvariants ? productData.variants : null;
 
       output.success = true;
       output.data = productData;
@@ -431,17 +431,17 @@ router.get("/api/:productId", async (req, res) => {
       // 取得相關產品
       const relatedSql = `
         SELECT p.id, p.name AS product_name, p.price, p.image_url, p.description, p.average_rating
-        FROM Products p
-        JOIN Categories c ON p.category_id = c.id
+        FROM products p
+        JOIN categories c ON p.category_id = c.id
         WHERE c.category_name = ? AND p.id != ?
         LIMIT 4;
       `;
 
       const [relatedRows] = await db.query(relatedSql, [productData.category_name, productId]);
-      output.relatedProducts = relatedRows;
+      output.relatedproducts = relatedRows;
 
       if (memberId) {
-        const likeSql = `SELECT like_id FROM Favorites WHERE member_id = ? AND product_id = ?`;
+        const likeSql = `SELECT like_id FROM favorites WHERE member_id = ? AND product_id = ?`;
         const [likeRows] = await db.query(likeSql, [memberId, productId]);
         console.log(likeRows);
         output.like_id = likeRows.length > 0 ? likeRows[0].like_id : false;
@@ -550,7 +550,7 @@ router.get("/api/toggle-like/:productId", async (req, res) => {
   }
 
 console.log("Member ID:", member_id);
-console.log("Product ID:", product_id);
+console.log("product ID:", product_id);
 
   const sql = `
     select memberlike.like_id from products left join (SELECT * FROM favorites WHERE member_id=?) memberlike on products.id = memberlike.product_id WHERE products.id =?;
@@ -592,7 +592,7 @@ router.delete("/api/favorites/:productId", async (req, res) => {
   try {
     // 檢查該商品是否在用戶的收藏列表中
     const [existingFavorite] = await db.query(
-      "SELECT * FROM Favorites WHERE member_id = ? AND product_id = ?",
+      "SELECT * FROM favorites WHERE member_id = ? AND product_id = ?",
       [member_id, productId]
     );
 
@@ -602,7 +602,7 @@ router.delete("/api/favorites/:productId", async (req, res) => {
 
     // 刪除收藏記錄
     const [result] = await db.query(
-      "DELETE FROM Favorites WHERE member_id = ? AND product_id = ?",
+      "DELETE FROM favorites WHERE member_id = ? AND product_id = ?",
       [member_id, productId]
     );
 

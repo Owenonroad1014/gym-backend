@@ -73,7 +73,7 @@ async function checkUpcomingClasses() {
   }
 }
 
-// 設定每5分鐘執行一次通知
+// 設定每2分鐘執行一次通知
 schedule.scheduleJob("*/2 * * * *", checkUpcomingClasses);
 
 // 測試用 API 端點

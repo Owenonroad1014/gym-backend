@@ -9,10 +9,11 @@ const db = mysql.createPool({
   user: DB_USER,
   password: DB_PASS,
   database: DB_NAME,
-
+  port: DB_PORT,
   waitForConnections: true,
   connectionLimit: 5,
   queueLimit: 0,
 });
 
 export default db;
+
