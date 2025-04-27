@@ -12,15 +12,15 @@
     ],
     "routes": [
       {
-        "src": "/public/img/(.*)",
+        "src": "/img/(.*)",
         "dest": "/public/img/$1"
       },
       {
-        "src": "/public/img/avatar/(.*)",
+        "src": "/img/avatar/(.*)",
         "dest": "/public/img/avatar/$1"
       },
       {
-        "src": "/public/imgs/(.*)",
+        "src": "/imgs/(.*)",
         "dest": "/public/imgs/$1"
       },
       {
