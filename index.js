@@ -35,7 +35,6 @@ const MysqlStore = mysql_session(session);
 
 const app = express();
 
-app.set("view engine", "ejs");
 
 // 設定靜態內容資料夾
 app.use(express.static("public"));
@@ -107,10 +106,9 @@ app.use("/email", emailRouter);
 app.use("/videos", videosRouter);
 
 app.get("/", (req, res) => {
-  res.locals.title = "首頁 - " + res.locals.title;
-  res.locals.pageName = "home";
-  res.render("home", { name: "小八" });
+  res.json({ message: "API is running" });
 });
+
 
 app.get("/json-sales", (req, res) => {
   res.locals.title = "業務員 - " + res.locals.title;
