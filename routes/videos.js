@@ -172,7 +172,7 @@ router.get("/api/favorites", async (req, res) => {
         c.category_name, 
         v.created_at
       FROM video_favorites f
-      JOIN Videos v ON f.video_id = v.id
+      JOIN videos v ON f.video_id = v.id
       JOIN videos_categories c ON v.category_id = c.id
       WHERE f.member_id = ? 
       ORDER BY f.created_at DESC
@@ -201,7 +201,7 @@ router.get("/api", async (req, res) => {
 router.get("/api/:productId", async (req, res) => {
   const productId = req.params.productId;
   const memberId = req.my_jwt?.id; 
-  const output = { success: false, data: null, relatedProducts: [] ,like_id : null, memberId : memberId};
+  const output = { success: false, data: null, relatedproducts: [] ,like_id : null, memberId : memberId};
 
   try {
     const sql = `
@@ -217,8 +217,8 @@ router.get("/api/:productId", async (req, res) => {
       JSON_ARRAYAGG(
         JSON_OBJECT('variant_id', pv.id, 'weight', pv.weight, 'image_url', pv.image_url)
       ) AS variants
-      FROM Products p
-      JOIN Categories c ON p.category_id = c.id
+      FROM products p
+      JOIN categories c ON p.category_id = c.id
       LEFT JOIN ProductVariants pv ON p.id = pv.product_id
       WHERE p.id = ?
       GROUP BY p.id, p.product_code, p.name, p.description, c.category_name, 
@@ -244,14 +244,14 @@ router.get("/api/:productId", async (req, res) => {
       // 取得相關產品
       const relatedSql = `
         SELECT p.id, p.name AS product_name, p.price, p.image_url, p.description
-        FROM Products p
-        JOIN Categories c ON p.category_id = c.id
+        FROM products p
+        JOIN categories c ON p.category_id = c.id
         WHERE c.category_name = ? AND p.id != ?
         LIMIT 4;
       `;
 
       const [relatedRows] = await db.query(relatedSql, [productData.category_name, productId]);
-      output.relatedProducts = relatedRows;
+      output.relatedproducts = relatedRows;
 
       if (memberId) {
         const likeSql = `SELECT like_id FROM Favorites WHERE member_id = ? AND product_id = ?`;
