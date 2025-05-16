@@ -84,6 +84,31 @@ router.delete("/api/:id", async (req, res) => {
   
 })
 
+// PUT /api/todo/:id
+router.put("/api/:id", async (req, res) => {
+  const output = {
+    success: false,
+    error: "",
+  };
+  const { id } = req.params;
+  const { is_completed } = req.body;
+  try {
+   const [result] = await db.query("UPDATE todos SET is_completed=? WHERE id=?", [
+      is_completed,
+      id,
+    ]);
+    if (result.affectedRows) {
+      output.success = true;
+    } else {
+      output.error = "更新失敗";
+    }
+    return res.json(output);
+  }catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "伺服器錯誤" });
+  }
+})
+
 
 
 export default router;
