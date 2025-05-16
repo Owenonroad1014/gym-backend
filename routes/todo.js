@@ -25,8 +25,11 @@ router.post("/api", async (req, res) => {
             output.task = task;
         } else {
             output.error = "新增失敗";
-        } 
-    }
+        }
+    }catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "伺服器錯誤" });
+  }
 });
 
 // GET /api/todo
