@@ -91,10 +91,9 @@ router.put("/api/:id", async (req, res) => {
     error: "",
   };
   const { id } = req.params;
-  const { is_completed } = req.body;
+  
   try {
-   const [result] = await db.query("UPDATE todos SET is_completed=? WHERE id=?", [
-      is_completed,
+   const [result] = await db.query("UPDATE todos SET is_completed=true WHERE id=?", [
       id,
     ]);
     if (result.affectedRows) {
