@@ -62,6 +62,28 @@ router.get("/api", async (req, res) => {
   }
 });
 
+// DELETE /api/todo/:id
+router.delete("/api/:id", async (req, res) => {
+  const output = {
+    success: false,
+    error: "",
+  };
+  const { id } = req.params;
+  try {
+    const [result] = await db.query("DELETE FROM todos WHERE id=?", [id]);
+    if (result.affectedRows) {
+      output.success = true;
+    } else {
+      output.error = "刪除失敗";
+    }
+    return res.json(output);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "伺服器錯誤" });
+  }
+  
+})
+
 
 
 export default router;
