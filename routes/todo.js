@@ -1,5 +1,5 @@
 import express from "express";
-import fs from "node:fs/promises";
+
 import db from "../utils/connect-mysql.js";
 
 const router = express.Router();
