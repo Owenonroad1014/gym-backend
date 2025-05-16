@@ -29,6 +29,7 @@ import mailRouter from "./routes/mail.js";
 import changePassRouter from "./routes/change-password.js";
 import profileRouter from "./routes/profile.js";
 import emailRouter from "./routes/email.js";
+import todoRouter from "./routes/todo.js";
 
 const MysqlStore = mysql_session(session);
 // const sessionStore = new MysqlStore({}, db);
@@ -104,6 +105,7 @@ app.use("/memberCenter", memberCenterRouter);
 app.use("/profile", profileRouter);
 app.use("/email", emailRouter);
 app.use("/videos", videosRouter);
+app.use("/todo", todoRouter);
 
 app.get("/", (req, res) => {
   res.json({ message: "API is running" });
