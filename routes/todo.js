@@ -26,6 +26,8 @@ router.post("/api", async (req, res) => {
         } else {
             output.error = "新增失敗";
         }
+
+       return res.json(output);
     }catch (error) {
     console.error(error);
     res.status(500).json({ error: "伺服器錯誤" });
@@ -53,7 +55,7 @@ router.get("/api", async (req, res) => {
     } else {
       output.error = "目前沒有資料";
     }
-    res.json(output);
+    return res.json(output);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "伺服器錯誤" });
