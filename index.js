@@ -46,7 +46,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 const corsOptions = {
   credentials: true,
-  origin: ['http://localhost:3000', 'https://gym-next-gamma.vercel.app'],
+  origin: ['http://localhost:3000', 'https://gym-next-gamma.vercel.app', "https://todo-app-seven-virid.vercel.app/"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
